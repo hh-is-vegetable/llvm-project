@@ -2045,6 +2045,25 @@ cc_binary(
 )
 
 cc_binary(
+    name = "clang-abigen",
+    srcs = ["tools/clang-abigen/ClangAbiGen.cpp"],
+    stamp = 0,
+    deps = [
+        ":ast",
+        ":codegen",
+        ":driver",
+        ":frontend",
+        ":frontend_rewrite",
+        ":serialization",
+        ":static_analyzer_frontend",
+        ":tooling",
+        ":tooling_syntax",
+        "//llvm:Option",
+        "//llvm:Support",
+    ],
+)
+
+cc_binary(
     name = "clang-format",
     srcs = [
         "tools/clang-format/ClangFormat.cpp",

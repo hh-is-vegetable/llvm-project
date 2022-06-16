@@ -380,12 +380,25 @@ bool Sema::checkStringLiteralArgumentAttr(const ParsedAttr &AL, unsigned ArgNum,
   return checkStringLiteralArgumentAttr(AL, ArgExpr, Str, ArgLocation);
 }
 
+
+
 /// Applies the given attribute to the Decl without performing any
 /// additional semantic checking.
 template <typename AttrType>
 static void handleSimpleAttribute(Sema &S, Decl *D,
                                   const AttributeCommonInfo &CI) {
   D->addAttr(::new (S.Context) AttrType(S.Context, CI));
+}
+
+static void handleFvmContractAttributes(Sema &S, Decl *D, const ParsedAttr &AL) {
+  StringRef Str;
+  if (AL.isArgExpr(0) && AL.getArgAsExpr(0) && 
+      !S.checkStringLiteralArgumentAttr(AL, 0, Str))
+  return;
+  // D->addAttr(::new (S.Context)
+  //               FvmContractAttr(S.Context, Str,
+  //                               AL.getAttributeSpellingListIndex()));
+  handleSimpleAttribute<FvmContractAttr>(S, D, AL);
 }
 
 template <typename... DiagnosticArgs>
@@ -9042,6 +9055,10 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
 
   case ParsedAttr::AT_UsingIfExists:
     handleSimpleAttribute<UsingIfExistsAttr>(S, D, AL);
+    break;
+  
+  case ParsedAttr::AT_FvmContract:
+    handleFvmContractAttributes(S, D, AL);
     break;
   }
 }

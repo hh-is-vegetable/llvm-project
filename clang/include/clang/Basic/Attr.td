@@ -4011,3 +4011,10 @@ def NoRandomizeLayout : InheritableAttr {
   let LangOpts = [COnly];
 }
 def : MutualExclusions<[RandomizeLayout, NoRandomizeLayout]>;
+
+def FvmContract : InheritableAttr {
+   let Spellings = [CXX11<"fvm", "contract">, GNU<"fvm_contract">];
+   let Args = [StringArgument<"name", 1>];
+   let Subjects = SubjectList<[CXXRecord, CXXMethod, Function]>;
+   let Documentation = [FvmContractDocs];
+}

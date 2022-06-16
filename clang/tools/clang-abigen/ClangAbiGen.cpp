@@ -33,10 +33,16 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
+#include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/Frontend/FrontendAction.h"
+#include <set>
+#include <vector>
+#include <map>
 
 using namespace clang::driver;
 using namespace clang::tooling;
 using namespace llvm;
+using namespace std;
 
 static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 static cl::extrahelp MoreHelp(
@@ -54,8 +60,15 @@ static cl::extrahelp MoreHelp(
     "\n"
 );
 
-static cl::OptionCategory ClangAbiGen("clang-check options");
+static cl::OptionCategory ClangAbiGen("clang-abigen options");
+
 static const opt::OptTable &Options = getDriverOptTable();
+
+static cl::opt<bool> 
+    ABIGen("abigen",
+            cl::desc("ABI file generation"),
+            cl::cat(ClangAbiGen));
+
 static cl::opt<bool>
     ASTDump("ast-dump",
             cl::desc(Options.getOptionHelpText(options::OPT_ast_dump)),
@@ -81,13 +94,13 @@ static cl::opt<std::string>
                    cl::desc(Options.getOptionHelpText(options::OPT_o)),
                    cl::cat(ClangAbiGen));
 
-static cl::opt<bool>
-    Fixit("fixit", cl::desc(Options.getOptionHelpText(options::OPT_fixit)),
-          cl::cat(ClangAbiGen));
-static cl::opt<bool> FixWhatYouCan(
-    "fix-what-you-can",
-    cl::desc(Options.getOptionHelpText(options::OPT_fix_what_you_can)),
-    cl::cat(ClangAbiGen));
+// static cl::opt<bool>
+//     Fixit("fixit", cl::desc(Options.getOptionHelpText(options::OPT_fixit)),
+//           cl::cat(ClangAbiGen));
+// static cl::opt<bool> FixWhatYouCan(
+//     "fix-what-you-can",
+//     cl::desc(Options.getOptionHelpText(options::OPT_fix_what_you_can)),
+//     cl::cat(ClangAbiGen));
 
 static cl::opt<bool> SyntaxTreeDump("syntax-tree-dump",
                                     cl::desc("dump the syntax tree"),
@@ -98,52 +111,52 @@ static cl::opt<bool> TokensDump("tokens-dump",
 
 namespace {
 
-// FIXME: Move FixItRewriteInPlace from lib/Rewrite/Frontend/FrontendActions.cpp
-// into a header file and reuse that.
-class FixItOptions : public clang::FixItOptions {
-public:
-  FixItOptions() {
-    FixWhatYouCan = ::FixWhatYouCan;
-  }
+// // FIXME: Move FixItRewriteInPlace from lib/Rewrite/Frontend/FrontendActions.cpp
+// // into a header file and reuse that.
+// class FixItOptions : public clang::FixItOptions {
+// public:
+//   FixItOptions() {
+//     FixWhatYouCan = ::FixWhatYouCan;
+//   }
 
-  std::string RewriteFilename(const std::string& filename, int &fd) override {
-    // We don't need to do permission checking here since clang will diagnose
-    // any I/O errors itself.
+//   std::string RewriteFilename(const std::string& filename, int &fd) override {
+//     // We don't need to do permission checking here since clang will diagnose
+//     // any I/O errors itself.
 
-    fd = -1;  // No file descriptor for file.
+//     fd = -1;  // No file descriptor for file.
 
-    return filename;
-  }
-};
+//     return filename;
+//   }
+// };
 
-/// Subclasses \c clang::FixItRewriter to not count fixed errors/warnings
-/// in the final error counts.
-///
-/// This has the side-effect that clang-check -fixit exits with code 0 on
-/// successfully fixing all errors.
-class FixItRewriter : public clang::FixItRewriter {
-public:
-  FixItRewriter(clang::DiagnosticsEngine& Diags,
-                clang::SourceManager& SourceMgr,
-                const clang::LangOptions& LangOpts,
-                clang::FixItOptions* FixItOpts)
-      : clang::FixItRewriter(Diags, SourceMgr, LangOpts, FixItOpts) {
-  }
+// /// Subclasses \c clang::FixItRewriter to not count fixed errors/warnings
+// /// in the final error counts.
+// ///
+// /// This has the side-effect that clang-check -fixit exits with code 0 on
+// /// successfully fixing all errors.
+// class FixItRewriter : public clang::FixItRewriter {
+// public:
+//   FixItRewriter(clang::DiagnosticsEngine& Diags,
+//                 clang::SourceManager& SourceMgr,
+//                 const clang::LangOptions& LangOpts,
+//                 clang::FixItOptions* FixItOpts)
+//       : clang::FixItRewriter(Diags, SourceMgr, LangOpts, FixItOpts) {
+//   }
 
-  bool IncludeInDiagnosticCounts() const override { return false; }
-};
+//   bool IncludeInDiagnosticCounts() const override { return false; }
+// };
 
-/// Subclasses \c clang::FixItAction so that we can install the custom
-/// \c FixItRewriter.
-class ClangCheckFixItAction : public clang::FixItAction {
-public:
-  bool BeginSourceFileAction(clang::CompilerInstance& CI) override {
-    FixItOpts.reset(new FixItOptions);
-    Rewriter.reset(new FixItRewriter(CI.getDiagnostics(), CI.getSourceManager(),
-                                     CI.getLangOpts(), FixItOpts.get()));
-    return true;
-  }
-};
+// /// Subclasses \c clang::FixItAction so that we can install the custom
+// /// \c FixItRewriter.
+// class ClangCheckFixItAction : public clang::FixItAction {
+// public:
+//   bool BeginSourceFileAction(clang::CompilerInstance& CI) override {
+//     FixItOpts.reset(new FixItOptions);
+//     Rewriter.reset(new FixItRewriter(CI.getDiagnostics(), CI.getSourceManager(),
+//                                      CI.getLangOpts(), FixItOpts.get()));
+//     return true;
+//   }
+// };
 
 class DumpSyntaxTree : public clang::ASTFrontendAction {
 public:
@@ -186,6 +199,65 @@ public:
     return std::make_unique<clang::ASTConsumer>();
   }
 };
+
+// -------------------------------------------abi gen
+class abiGen {
+  // inputs and output for method
+  typedef struct methodParamTypes{
+    std::vector<std::string> inputs;
+    std::vector<std::string> output;
+  } methodParamTypes; 
+  std::map<std::string, methodParamTypes> abiMethods;
+  std::set<std::string> typeSet;
+public:
+  void addType(std::string type) {
+    typeSet.insert(type);
+  }
+
+};
+
+class ABIGenClassVisitor
+  : public RecursiveASTVisitor<ABIGenClassVisitor> {
+public:
+  bool VisitCXXRecordDecl(CXXRecordDecl *Declaration) {
+    // For debugging, dumping the AST nodes will show which nodes are already
+    // being visited.
+    Declaration->dump();
+
+    // The return value indicates whether we want the visitation to proceed.
+    // Return false to stop the traversal of the AST.
+    return true;
+  }
+  bool VisitCXXMethodDecl(clang::CXXMethodDecl* decl) {
+    decl->dump();
+    return true;
+  }
+};
+
+class ABIGenClassConsumer : public clang::ASTConsumer {
+public:
+  virtual void HandleTranslationUnit(clang::ASTContext &Context) {
+    // Traversing the translation unit decl via a RecursiveASTVisitor
+    // will visit all nodes in the AST.
+    Visitor.TraverseDecl(Context.getTranslationUnitDecl());
+  }
+private:
+  // A RecursiveASTVisitor implementation.
+  ABIGenClassVisitor Visitor;
+};
+
+class ABIGenClassAction : public clang::ASTFrontendAction {
+public:
+  // virtual std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
+  //   clang::CompilerInstance &Compiler, llvm::StringRef InFile) {
+  //   return std::make_unique<ABIGenClassConsumer>();
+  // }
+  virtual std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
+    clang::CompilerInstance &Compiler, llvm::StringRef InFile) {
+    return std::make_unique<ABIGenClassConsumer>(&Compiler.getASTContext()); // get ASTContext
+  } 
+};
+
 
 } // namespace
 
@@ -246,8 +318,10 @@ int main(int argc, const char **argv) {
   // Choose the correct factory based on the selected mode.
   if (Analyze)
     FrontendFactory = newFrontendActionFactory<clang::ento::AnalysisAction>();
-  else if (Fixit)
-    FrontendFactory = newFrontendActionFactory<ClangCheckFixItAction>();
+  else if(ABIGen)
+    FrontendFactory = newFrontendActionFactory<ABIGenClassAction>();
+  // else if (Fixit)
+  //   FrontendFactory = newFrontendActionFactory<ClangCheckFixItAction>();
   else if (SyntaxTreeDump || TokensDump)
     FrontendFactory = newFrontendActionFactory<DumpSyntaxTree>();
   else

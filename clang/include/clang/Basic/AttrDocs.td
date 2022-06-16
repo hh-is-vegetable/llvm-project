@@ -6543,3 +6543,10 @@ evaluate to NULL.
 
   }];
 }
+
+def FvmContractDocs : Documentation {
+  let Category = DocCatFunction;
+  let Content = [{
+    the ``fvm::contract`` attribute marks a method as being an eosio contract.
+  }];
+}

@@ -782,6 +782,8 @@ public:
     return data().UserDeclaredSpecialMembers & SMF_CopyConstructor;
   }
 
+  // bool hasFvmContractAttr() const { return hasAttr<FvmContractAttr>(); }
+
   /// Determine whether this class needs an implicit copy
   /// constructor to be lazily declared.
   bool needsImplicitCopyConstructor() const {
@@ -2019,6 +2021,8 @@ public:
 
     return CD->size_overridden_methods() != 0;
   }
+
+  // bool hasFvmContractAttr() const { return hasAttr<FvmContractAttr>(); }
 
   /// If it's possible to devirtualize a call to this method, return the called
   /// function. Otherwise, return null.

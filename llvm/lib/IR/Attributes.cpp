@@ -403,6 +403,10 @@ std::string Attribute::getAsString(bool InAttrGrp) const {
   //   align=4
   //   alignstack=8
   //
+  // if (hasAttribute(Attribute::FvmContract)) {
+  //   return "fvm_contract";
+  // }
+
   if (hasAttribute(Attribute::Alignment))
     return (InAttrGrp ? "align=" + Twine(getValueAsInt())
                       : "align " + Twine(getValueAsInt()))
