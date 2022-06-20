@@ -1,19 +1,14 @@
-//===--- tools/clang-check/ClangCheck.cpp - Clang check tool --------------===//
-//
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-//
-//  This file implements a clang-check tool that runs clang based on the info
-//  stored in a compilation database.
-//
-//  This tool uses the Clang Tooling infrastructure, see
-//    http://clang.llvm.org/docs/HowToSetupToolingForLLVM.html
-//  for details on setting it up with LLVM source tree.
-//
-//===----------------------------------------------------------------------===//
+
+#pragma once 
+
+#include "clang/AST/AST.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/QualTypeNames.h"
+#include "clang/Frontend/FrontendActions.h"
+#include "clang/Tooling/CommonOptionsParser.h"
+#include "clang/Tooling/Tooling.h"
+#include "clang/Rewrite/Core/Rewriter.h"
+#include "clang/Rewrite/Frontend/Rewriters.h"
 
 #include "clang/AST/ASTConsumer.h"
 #include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
@@ -43,6 +38,7 @@ using namespace clang::driver;
 using namespace clang::tooling;
 using namespace llvm;
 using namespace std;
+// using namespace abigen;
 
 static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 static cl::extrahelp MoreHelp(
@@ -94,13 +90,6 @@ static cl::opt<std::string>
                    cl::desc(Options.getOptionHelpText(options::OPT_o)),
                    cl::cat(ClangAbiGen));
 
-// static cl::opt<bool>
-//     Fixit("fixit", cl::desc(Options.getOptionHelpText(options::OPT_fixit)),
-//           cl::cat(ClangAbiGen));
-// static cl::opt<bool> FixWhatYouCan(
-//     "fix-what-you-can",
-//     cl::desc(Options.getOptionHelpText(options::OPT_fix_what_you_can)),
-//     cl::cat(ClangAbiGen));
 
 static cl::opt<bool> SyntaxTreeDump("syntax-tree-dump",
                                     cl::desc("dump the syntax tree"),
@@ -109,54 +98,7 @@ static cl::opt<bool> TokensDump("tokens-dump",
                                 cl::desc("dump the preprocessed tokens"),
                                 cl::cat(ClangAbiGen));
 
-namespace {
-
-// // FIXME: Move FixItRewriteInPlace from lib/Rewrite/Frontend/FrontendActions.cpp
-// // into a header file and reuse that.
-// class FixItOptions : public clang::FixItOptions {
-// public:
-//   FixItOptions() {
-//     FixWhatYouCan = ::FixWhatYouCan;
-//   }
-
-//   std::string RewriteFilename(const std::string& filename, int &fd) override {
-//     // We don't need to do permission checking here since clang will diagnose
-//     // any I/O errors itself.
-
-//     fd = -1;  // No file descriptor for file.
-
-//     return filename;
-//   }
-// };
-
-// /// Subclasses \c clang::FixItRewriter to not count fixed errors/warnings
-// /// in the final error counts.
-// ///
-// /// This has the side-effect that clang-check -fixit exits with code 0 on
-// /// successfully fixing all errors.
-// class FixItRewriter : public clang::FixItRewriter {
-// public:
-//   FixItRewriter(clang::DiagnosticsEngine& Diags,
-//                 clang::SourceManager& SourceMgr,
-//                 const clang::LangOptions& LangOpts,
-//                 clang::FixItOptions* FixItOpts)
-//       : clang::FixItRewriter(Diags, SourceMgr, LangOpts, FixItOpts) {
-//   }
-
-//   bool IncludeInDiagnosticCounts() const override { return false; }
-// };
-
-// /// Subclasses \c clang::FixItAction so that we can install the custom
-// /// \c FixItRewriter.
-// class ClangCheckFixItAction : public clang::FixItAction {
-// public:
-//   bool BeginSourceFileAction(clang::CompilerInstance& CI) override {
-//     FixItOpts.reset(new FixItOptions);
-//     Rewriter.reset(new FixItRewriter(CI.getDiagnostics(), CI.getSourceManager(),
-//                                      CI.getLangOpts(), FixItOpts.get()));
-//     return true;
-//   }
-// };
+namespace /*abigen*/ {
 
 class DumpSyntaxTree : public clang::ASTFrontendAction {
 public:
@@ -216,9 +158,12 @@ public:
 
 };
 
-// class ABIGenClassVisitor
-//   : public RecursiveASTVisitor<ABIGenClassVisitor> {
+// class ABIGenClassVisitor : public RecursiveASTVisitor<ABIGenClassVisitor> {
 // public:
+//   explicit ABIGenClassVisitor(CompilerInstance *CI) {
+//     get_error_emitter().set_compiler_instance(CI);
+//   }
+
 //   bool VisitCXXRecordDecl(CXXRecordDecl *Declaration) {
 //     // For debugging, dumping the AST nodes will show which nodes are already
 //     // being visited.
@@ -258,74 +203,48 @@ public:
 //   } 
 // };
 
+// // abi gen---------------------------------------
 
 } // namespace
 
-int main(int argc, const char **argv) {
-  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
 
-  // Initialize targets for clang module support.
-  llvm::InitializeAllTargets();
-  llvm::InitializeAllTargetMCs();
-  llvm::InitializeAllAsmPrinters();
-  llvm::InitializeAllAsmParsers();
+// class FindNamedClassVisitor
+//   : public RecursiveASTVisitor <FindNamedClassVisitor> {
+// public:
+//   bool VisitCXXRecordDecl(CXXRecordDecl *Declaration) {
+//     // For debugging, dumping the AST nodes will show which nodes are already
+//     // being visited.
+//     Declaration->dump();
 
-  auto ExpectedParser =
-      CommonOptionsParser::create(argc, argv, ClangAbiGen);
-  if (!ExpectedParser) {
-    llvm::errs() << ExpectedParser.takeError();
-    return 1;
-  }
-  CommonOptionsParser &OptionsParser = ExpectedParser.get();
-  ClangTool Tool(OptionsParser.getCompilations(),
-                 OptionsParser.getSourcePathList());
+//     // The return value indicates whether we want the visitation to proceed.
+//     // Return false to stop the traversal of the AST.
+//     return true;
+//   }
+// };
+// namespace {
+//     class eosio_abigen_visitor : public RecursiveASTVisitor<eosio_abigen_visitor> {
+      
 
-  if (Analyze) {
-    // Set output path if is provided by user.
-    //
-    // As the original -o options have been removed by default via the
-    // strip-output adjuster, we only need to add the analyzer -o options here
-    // when it is provided by users.
-    if (!AnalyzerOutput.empty())
-      Tool.appendArgumentsAdjuster(
-          getInsertArgumentAdjuster(CommandLineArguments{"-o", AnalyzerOutput},
-                                    ArgumentInsertPosition::END));
+//     public:
+//         explicit eosio_abigen_visitor(CompilerInstance *CI) {
+//         get_error_emitter().set_compiler_instance(CI);
+//         }
 
-    // Running the analyzer requires --analyze. Other modes can work with the
-    // -fsyntax-only option.
-    //
-    // The syntax-only adjuster is installed by default.
-    // Good: It also strips options that trigger extra output, like -save-temps.
-    // Bad:  We don't want the -fsyntax-only when executing the static analyzer.
-    //
-    // To enable the static analyzer, we first strip all -fsyntax-only options
-    // and then add an --analyze option to the front.
-    Tool.appendArgumentsAdjuster(
-        [&](const CommandLineArguments &Args, StringRef /*unused*/) {
-          CommandLineArguments AdjustedArgs;
-          for (const std::string &Arg : Args)
-            if (Arg != "-fsyntax-only")
-              AdjustedArgs.emplace_back(Arg);
-          return AdjustedArgs;
-        });
-    Tool.appendArgumentsAdjuster(
-        getInsertArgumentAdjuster("--analyze", ArgumentInsertPosition::BEGIN));
-  }
+//         bool shouldVisitTemplateInstantiations() const {
+//         return true;
+//         }
 
-  ClangCheckActionFactory CheckFactory;
-  std::unique_ptr<FrontendActionFactory> FrontendFactory;
-
-  // Choose the correct factory based on the selected mode.
-  if (Analyze)
-    FrontendFactory = newFrontendActionFactory<clang::ento::AnalysisAction>();
-  // else if(ABIGen)
-  //   FrontendFactory = newFrontendActionFactory<ABIGenClassAction>();
-  // else if (Fixit)
-  //   FrontendFactory = newFrontendActionFactory<ClangCheckFixItAction>();
-  else if (SyntaxTreeDump || TokensDump)
-    FrontendFactory = newFrontendActionFactory<DumpSyntaxTree>();
-  else
-    FrontendFactory = newFrontendActionFactory(&CheckFactory);
-
-  return Tool.run(FrontendFactory.get());
-}
+//         virtual bool VisitCXXMethodDecl(clang::CXXMethodDecl* decl) {
+//         return true;
+//         }
+//         virtual bool VisitCXXRecordDecl(clang::CXXRecordDecl* decl) {
+        
+//         return true;
+//         }
+//         virtual bool VisitDecl(clang::Decl* decl) {
+        
+//         return true;
+//         }
+//     };
+// }
+    

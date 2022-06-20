@@ -74,3 +74,4 @@ pythonenv*
 build/**
 build2/**
 mybuilddir/**
+tests/**
