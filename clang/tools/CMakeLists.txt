@@ -51,5 +51,5 @@ add_clang_subdirectory(libclang)
 
 add_clang_subdirectory(amdgpu-arch)
 
-add_clang_subdirectory(clang-abigen)
+# add_clang_subdirectory(clang-abigen)
 add_clang_subdirectory(find-class-decls)
