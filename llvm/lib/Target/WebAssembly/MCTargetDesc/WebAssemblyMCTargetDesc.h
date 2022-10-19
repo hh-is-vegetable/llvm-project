@@ -298,6 +298,8 @@ inline bool isArgument(unsigned Opc) {
   case WebAssembly::ARGUMENT_funcref_S:
   case WebAssembly::ARGUMENT_externref:
   case WebAssembly::ARGUMENT_externref_S:
+  case WebAssembly::ARGUMENT_memref:
+  case WebAssembly::ARGUMENT_memref_S:
     return true;
   default:
     return false;
@@ -320,6 +322,7 @@ inline bool isCopy(unsigned Opc) {
   case WebAssembly::COPY_FUNCREF_S:
   case WebAssembly::COPY_EXTERNREF:
   case WebAssembly::COPY_EXTERNREF_S:
+  // case WebAssembly::COPY_MEMREF_S:
     return true;
   default:
     return false;

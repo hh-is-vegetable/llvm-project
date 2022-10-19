@@ -256,6 +256,7 @@ enum IIT_Info {
   IIT_ANYPTR_TO_ELT = 56,
   IIT_I2 = 57,
   IIT_I4 = 58,
+  IIT_MEMREF = 59,
 };
 
 static void EncodeFixedValueType(MVT::SimpleValueType VT,
@@ -296,6 +297,8 @@ static void EncodeFixedValueType(MVT::SimpleValueType VT,
     return Sig.push_back(IIT_EXTERNREF);
   case MVT::funcref:
     return Sig.push_back(IIT_FUNCREF);
+  case MVT::memref:
+    return Sig.push_back(IIT_MEMREF);
   }
   // clang-format on
 }

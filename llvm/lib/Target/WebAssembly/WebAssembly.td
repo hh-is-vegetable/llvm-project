@@ -71,6 +71,9 @@ def FeatureExtendedConst :
       SubtargetFeature<"extended-const", "HasExtendedConst", "true",
                        "Enable extended const expressions">;
 
+def FeatureMemRef :
+      SubtargetFeature<"memory-reference-type", "HasMemRef", "true",
+                        "Enable memory reference type">;
 //===----------------------------------------------------------------------===//
 // Architectures.
 //===----------------------------------------------------------------------===//

@@ -58,6 +58,31 @@ multiclass WebAssemblyLoad<WebAssemblyRegClass rc, string Name, int Opcode,
   }
 }
 
+// msload
+multiclass WebAssemblyMSLoad<WebAssemblyRegClass rc, string Name, int Opcode,
+                           list<Predicate> reqs = []> {
+  let mayLoad = 1, UseNamedOperandTable = 1 in {
+  defm "_A32": I<(outs rc:$dst),
+                 (ins P2Align:$p2align, offset32_op:$off, MEMREF:$addr),
+                 (outs), (ins P2Align:$p2align, offset32_op:$off),
+                 [], !strconcat(Name, "\t$dst, ${off}(${addr})${p2align}"),
+                 !strconcat(Name, "\t${off}${p2align}"), Opcode, false>,
+               Requires<reqs>;
+  defm "_A64": I<(outs rc:$dst),
+                 (ins P2Align:$p2align, offset64_op:$off, MEMREF:$addr),
+                 (outs), (ins P2Align:$p2align, offset64_op:$off),
+                 [], !strconcat(Name, "\t$dst, ${off}(${addr})${p2align}"),
+                 !strconcat(Name, "\t${off}${p2align}"), Opcode, true>,
+               Requires<reqs>;
+  }
+}
+
+defm MSLOAD_I32 : WebAssemblyMSLoad<I32, "i32.msload", 0xc0, []>;
+defm MSLOAD_I64 : WebAssemblyMSLoad<I64, "i64.msload", 0xc1, []>;
+defm MSLOAD_F32 : WebAssemblyMSLoad<F32, "f32.msload", 0xc2, []>;
+defm MSLOAD_F64 : WebAssemblyMSLoad<F64, "f64.msload", 0xc3, []>;
+defm MSLOAD_MEMREF : WebAssemblyMSLoad<MEMREF, "memref.msload", 0xc4, []>;
+
 // Basic load.
 // FIXME: When we can break syntax compatibility, reorder the fields in the
 // asmstrings to match the binary encoding.

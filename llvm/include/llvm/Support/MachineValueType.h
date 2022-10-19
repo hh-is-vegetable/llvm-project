@@ -280,6 +280,8 @@ namespace llvm {
       x86amx         = 183,    // This is an X86 AMX value
       i64x8          = 184,    // 8 Consecutive GPRs (AArch64)
 
+      memref         = 233,    // WebAssembly's memref type
+
       FIRST_VALUETYPE =  1,    // This is always the beginning of the list.
       LAST_VALUETYPE = i64x8,  // This always remains at the end of the list.
       VALUETYPE_SIZE = LAST_VALUETYPE + 1,
@@ -1078,6 +1080,7 @@ namespace llvm {
       case v2048i32:
       case v2048f32:  return TypeSize::Fixed(65536);
       case funcref:
+      case memref:
       case externref: return TypeSize::Fixed(0); // opaque type
       }
     }
