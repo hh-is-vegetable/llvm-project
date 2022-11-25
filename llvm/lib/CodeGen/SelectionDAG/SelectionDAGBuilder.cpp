@@ -2794,6 +2794,7 @@ void SelectionDAGBuilder::visitBitTestHeader(BitTestBlock &B,
   SDValue Sub = RangeSub;
   if (UsePtrType) {
     VT = TLI.getPointerTy(DAG.getDataLayout());
+    if(VT.isMemref() && TM.hasWasmMemref())VT = VT.changeTypeToInteger();
     Sub = DAG.getZExtOrTrunc(Sub, dl, VT);
   }
 
@@ -3489,6 +3490,10 @@ void SelectionDAGBuilder::visitPtrToInt(const User &I) {
   auto &TLI = DAG.getTargetLoweringInfo();
   EVT DestVT = DAG.getTargetLoweringInfo().getValueType(DAG.getDataLayout(),
                                                         I.getType());
+//  if(N.getValueType().isMemref()) {
+//    setValue(&I, DAG.getNode(ISD::PTRTOINT, getCurSDLoc(), DestVT, N));
+//    return;
+//  }
   EVT PtrMemVT =
       TLI.getMemValueType(DAG.getDataLayout(), I.getOperand(0)->getType());
   N = DAG.getPtrExtOrTrunc(N, getCurSDLoc(), PtrMemVT);
@@ -3502,6 +3507,10 @@ void SelectionDAGBuilder::visitIntToPtr(const User &I) {
   SDValue N = getValue(I.getOperand(0));
   auto &TLI = DAG.getTargetLoweringInfo();
   EVT DestVT = TLI.getValueType(DAG.getDataLayout(), I.getType());
+//  if(DestVT.isMemref()) {
+//    setValue(&I, DAG.getNode(ISD::INTTOPTR, getCurSDLoc(), DestVT, N));
+//    return;
+//  }
   EVT PtrMemVT = TLI.getMemValueType(DAG.getDataLayout(), I.getType());
   N = DAG.getZExtOrTrunc(N, getCurSDLoc(), PtrMemVT);
   N = DAG.getPtrExtOrTrunc(N, getCurSDLoc(), DestVT);
@@ -3860,7 +3869,14 @@ void SelectionDAGBuilder::visitExtractValue(const User &I) {
 }
 
 void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
+  LLVM_DEBUG(dbgs() << "start to view Graph\n");
+
+  LLVM_DEBUG(dbgs() << "--------\n");
   Value *Op0 = I.getOperand(0);
+  LLVM_DEBUG(dbgs()<<"visitGetElementPtr\nValue Op0:\n";I.dump() ;Op0->dump(););
+
+
+  LLVM_DEBUG(dbgs()<<"visitGetElementPtr end1\n");
   // Note that the pointer operand may be a vector of pointers. Take the scalar
   // element which holds a pointer.
   unsigned AS = Op0->getType()->getScalarType()->getPointerAddressSpace();
@@ -3875,6 +3891,11 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
       IsVectorGEP ? cast<VectorType>(I.getType())->getElementCount()
                   : ElementCount::getFixed(0);
 
+  LLVM_DEBUG(dbgs()<<"IsVectorGEP:"<<IsVectorGEP);
+  LLVM_DEBUG(dbgs()<<"\nN:\n";N.dump(););
+
+  LLVM_DEBUG(dbgs()<<"\n");
+
   if (IsVectorGEP && !N.getValueType().isVector()) {
     LLVMContext &Context = *DAG.getContext();
     EVT VT = EVT::getVectorVT(Context, N.getValueType(), VectorElementCount);
@@ -3884,8 +3905,9 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
       N = DAG.getSplatBuildVector(VT, dl, N);
   }
 
+  auto hasWasmMemref = TM.hasWasmMemref() && N.getValueType().isMemref();
   for (gep_type_iterator GTI = gep_type_begin(&I), E = gep_type_end(&I);
-       GTI != E; ++GTI) {
+       GTI != E; ++GTI) { // This loop is to get the real address = N + Offset
     const Value *Idx = GTI.getOperand();
     if (StructType *StTy = GTI.getStructTypeOrNull()) {
       unsigned Field = cast<Constant>(Idx)->getUniqueInteger().getZExtValue();
@@ -3900,7 +3922,11 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
         if (int64_t(Offset) >= 0 && cast<GEPOperator>(I).isInBounds())
           Flags.setNoUnsignedWrap(true);
 
-        N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
+        if(hasWasmMemref )
+          N = DAG.getNode(ISD::WASM_MEMREF_ADD, dl, N.getValueType(), N,
+                  DAG.getConstant(Offset, dl, N.getValueType().changeTypeToInteger()), Flags);
+        else
+          N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
                         DAG.getConstant(Offset, dl, N.getValueType()), Flags);
       }
     } else {
@@ -3941,9 +3967,11 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
         if (Offs.isNonNegative() && cast<GEPOperator>(I).isInBounds())
           Flags.setNoUnsignedWrap(true);
 
-        OffsVal = DAG.getSExtOrTrunc(OffsVal, dl, N.getValueType());
+        OffsVal = DAG.getSExtOrTrunc(OffsVal, dl, hasWasmMemref ?
+                                        N.getValueType().changeTypeToInteger() : N.getValueType());
 
-        N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N, OffsVal, Flags);
+        N = DAG.getNode(hasWasmMemref ? ISD::WASM_MEMREF_ADD : ISD::ADD,
+                        dl, N.getValueType(), N, OffsVal, Flags);
         continue;
       }
 
@@ -3961,16 +3989,19 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
 
       // If the index is smaller or larger than intptr_t, truncate or extend
       // it.
-      IdxN = DAG.getSExtOrTrunc(IdxN, dl, N.getValueType());
+      IdxN = DAG.getSExtOrTrunc(IdxN, dl, hasWasmMemref ?
+                                N.getValueType().changeTypeToInteger() : N.getValueType());
 
       if (ElementScalable) {
-        EVT VScaleTy = N.getValueType().getScalarType();
+        EVT VScaleTy = N.getValueType().getScalarType().isMemref() ?
+                       N.getValueType().getScalarType().changeTypeToInteger() : N.getValueType().getScalarType();
         SDValue VScale = DAG.getNode(
             ISD::VSCALE, dl, VScaleTy,
             DAG.getConstant(ElementMul.getZExtValue(), dl, VScaleTy));
         if (IsVectorGEP)
           VScale = DAG.getSplatVector(N.getValueType(), dl, VScale);
-        IdxN = DAG.getNode(ISD::MUL, dl, N.getValueType(), IdxN, VScale);
+        IdxN = DAG.getNode(ISD::MUL, dl,hasWasmMemref ? N.getValueType().changeTypeToInteger() :
+                                                       N.getValueType(), IdxN, VScale);
       } else {
         // If this is a multiply by a power of two, turn it into a shl
         // immediately.  This is a very common case.
@@ -3978,19 +4009,21 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
           if (ElementMul.isPowerOf2()) {
             unsigned Amt = ElementMul.logBase2();
             IdxN = DAG.getNode(ISD::SHL, dl,
-                               N.getValueType(), IdxN,
+                               hasWasmMemref ? N.getValueType().changeTypeToInteger() :
+                                             N.getValueType(), IdxN,
                                DAG.getConstant(Amt, dl, IdxN.getValueType()));
           } else {
             SDValue Scale = DAG.getConstant(ElementMul.getZExtValue(), dl,
                                             IdxN.getValueType());
             IdxN = DAG.getNode(ISD::MUL, dl,
-                               N.getValueType(), IdxN, Scale);
+                               hasWasmMemref ? N.getValueType().changeTypeToInteger() : N.getValueType(),
+                               IdxN, Scale);
           }
         }
       }
 
-      N = DAG.getNode(ISD::ADD, dl,
-                      N.getValueType(), N, IdxN);
+      N = DAG.getNode(hasWasmMemref ? ISD::WASM_MEMREF_ADD : ISD::ADD,
+                      dl,N.getValueType(), N, IdxN);
     }
   }
 
@@ -4001,17 +4034,29 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
     PtrMemTy = MVT::getVectorVT(PtrMemTy, VectorElementCount);
   }
 
-  if (PtrMemTy != PtrTy && !cast<GEPOperator>(I).isInBounds())
+  // memref do not do this now
+  if (!hasWasmMemref && PtrMemTy != PtrTy && !cast<GEPOperator>(I).isInBounds())
     N = DAG.getPtrExtendInReg(N, dl, PtrMemTy);
 
+  LLVM_DEBUG(dbgs() << "--------\n");
+//  DAG.viewGraph();
+  LLVM_DEBUG(dbgs() << "end view Graph\n");
   setValue(&I, N);
 }
 
 void SelectionDAGBuilder::visitAlloca(const AllocaInst &I) {
   // If this is a fixed sized alloca in the entry block of the function,
   // allocate it statically on the stack.
-  if (FuncInfo.StaticAllocaMap.count(&I))
+  if (FuncInfo.StaticAllocaMap.count(&I)) {
+    LLVM_DEBUG(dbgs()<<"visitAlloca in StaticAllocaMap\n"
+               <<"Instruction:\n";I.dump(););
+
+    LLVM_DEBUG(dbgs()<<"end static alloc map\n");
     return;   // getValue will auto-populate this.
+  }
+
+  LLVM_DEBUG(dbgs()<<"visitAlloca instruction I:\n";I.dump(););
+  LLVM_DEBUG(dbgs() << "end of Instruction I\n");
 
   SDLoc dl = getCurSDLoc();
   Type *Ty = I.getAllocatedType();
@@ -4021,11 +4066,15 @@ void SelectionDAGBuilder::visitAlloca(const AllocaInst &I) {
   MaybeAlign Alignment = std::max(DL.getPrefTypeAlign(Ty), I.getAlign());
 
   SDValue AllocSize = getValue(I.getArraySize());
+  LLVM_DEBUG(dbgs() << "\nAllocSize:\n";AllocSize.dump(););
 
   EVT IntPtr = TLI.getPointerTy(DAG.getDataLayout(), DL.getAllocaAddrSpace());
+  EVT PtrBack = IntPtr;
+  if (IntPtr.isMemref())IntPtr = IntPtr.changeTypeToInteger();
+  LLVM_DEBUG(dbgs()<<"\nIntPtr:"<<IntPtr.getEVTString()<<"\n");
   if (AllocSize.getValueType() != IntPtr)
     AllocSize = DAG.getZExtOrTrunc(AllocSize, dl, IntPtr);
-
+  LLVM_DEBUG(dbgs() << "TySize.isScalable:" << TySize.isScalable() << "\n");
   if (TySize.isScalable())
     AllocSize = DAG.getNode(ISD::MUL, dl, IntPtr, AllocSize,
                             DAG.getVScale(dl, IntPtr,
@@ -4059,7 +4108,10 @@ void SelectionDAGBuilder::visitAlloca(const AllocaInst &I) {
   SDValue Ops[] = {
       getRoot(), AllocSize,
       DAG.getConstant(Alignment ? Alignment->value() : 0, dl, IntPtr)};
-  SDVTList VTs = DAG.getVTList(AllocSize.getValueType(), MVT::Other);
+//  SDVTList VTs = DAG.getVTList(AllocSize.getValueType(), MVT::Other);
+  SDVTList VTs = DAG.getVTList(PtrBack.isMemref() ? PtrBack :
+                                   AllocSize.getValueType(), MVT::Other);
+  // operand 0 is chain, operand 1 is AllocSize, 2 is Alignment
   SDValue DSA = DAG.getNode(ISD::DYNAMIC_STACKALLOC, dl, VTs, Ops);
   setValue(&I, DSA);
   DAG.setRoot(DSA.getValue(1));
@@ -4142,6 +4194,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
     = TLI.getLoadMemOperandFlags(I, DAG.getDataLayout());
 
   unsigned ChainI = 0;
+  bool hasMemref = DAG.getTarget().hasWasmMemref() && Ptr.getValueType().isMemref();
   for (unsigned i = 0; i != NumValues; ++i, ++ChainI) {
     // Serializing loads here may result in excessive register pressure, and
     // TokenFactor places arbitrary choke points on the scheduler. SD scheduling
@@ -4156,9 +4209,11 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
       Root = Chain;
       ChainI = 0;
     }
-    SDValue A = DAG.getNode(ISD::ADD, dl,
-                            PtrVT, Ptr,
-                            DAG.getConstant(Offsets[i], dl, PtrVT),
+    // Addr = basePtr + offset
+    SDValue A = DAG.getNode( hasMemref ? ISD::WASM_MEMREF_ADD : ISD::ADD,
+                            dl,PtrVT, Ptr,
+                            DAG.getConstant(Offsets[i], dl,
+                                            hasMemref ? PtrVT.changeTypeToInteger() : PtrVT),
                             Flags);
 
     SDValue L = DAG.getLoad(MemVTs[i], dl, Root, A,
@@ -4258,6 +4313,9 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
     }
 
     if (const AllocaInst *Alloca = dyn_cast<AllocaInst>(PtrV)) {
+      LLVM_DEBUG(dbgs() << "visit store, ptr is from alloca\n");
+      Alloca->dump();
+      LLVM_DEBUG(dbgs() << "\n ptr is from alloca end\n");
       if (Alloca->isSwiftError())
         return visitStoreToSwiftError(I);
     }
@@ -4299,6 +4357,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
       Root = Chain;
       ChainI = 0;
     }
+    // addr = ptr + offset
     SDValue Add =
         DAG.getMemBasePlusOffset(Ptr, TypeSize::Fixed(Offsets[i]), dl, Flags);
     SDValue Val = SDValue(Src.getNode(), Src.getResNo() + i);

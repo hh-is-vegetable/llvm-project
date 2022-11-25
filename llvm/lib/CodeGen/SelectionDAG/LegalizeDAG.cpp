@@ -989,6 +989,14 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
   case ISD::STACKSAVE:
     Action = TLI.getOperationAction(Node->getOpcode(), MVT::Other);
     break;
+  case ISD::WASM_MEMREF_ADD:
+  case ISD::WASM_MEMREF_NARROW:
+  case ISD::WASM_MEMREF_AND:
+    Action = TLI.getOperationAction(Node->getOpcode(), MVT::memref);
+    break ;
+  case ISD::WASM_MEMREF_FIELD:
+    Action = TLI.getOperationAction(Node->getOpcode(), MVT::i32);
+    break ;
   case ISD::GET_DYNAMIC_AREA_OFFSET:
     Action = TLI.getOperationAction(Node->getOpcode(),
                                     Node->getValueType(0));
@@ -1679,6 +1687,7 @@ void SelectionDAGLegalize::ExpandDYNAMIC_STACKALLOC(SDNode* Node,
           " not tell us which reg is the stack pointer!");
   SDLoc dl(Node);
   EVT VT = Node->getValueType(0);
+  bool isMemref = VT.isMemref();
   SDValue Tmp1 = SDValue(Node, 0);
   SDValue Tmp2 = SDValue(Node, 1);
   SDValue Tmp3 = Node->getOperand(2);
@@ -1696,16 +1705,31 @@ void SelectionDAGLegalize::ExpandDYNAMIC_STACKALLOC(SDNode* Node,
   unsigned Opc =
     TFL->getStackGrowthDirection() == TargetFrameLowering::StackGrowsUp ?
     ISD::ADD : ISD::SUB;
+  if(isMemref) {
+    if(Opc == ISD::SUB)
+      Size = DAG.getNode(ISD::SUB, dl, Size.getValueType(),
+                       DAG.getConstant(0, dl, Size.getValueType()),
+                       Size);
+    Opc = ISD::WASM_MEMREF_ADD;
+  }
 
   Align StackAlign = TFL->getStackAlign();
   Tmp1 = DAG.getNode(Opc, dl, VT, SP, Size);       // Value
   if (Alignment > StackAlign)
-    Tmp1 = DAG.getNode(ISD::AND, dl, VT, Tmp1,
+    Tmp1 = DAG.getNode(isMemref ? ISD::WASM_MEMREF_AND : ISD::AND,
+                       dl, VT, Tmp1,
                        DAG.getConstant(-Alignment.value(), dl, VT));
   Chain = DAG.getCopyToReg(Chain, dl, SPReg, Tmp1);     // Output chain
 
   Tmp2 = DAG.getCALLSEQ_END(Chain, DAG.getIntPtrConstant(0, dl, true),
                             DAG.getIntPtrConstant(0, dl, true), SDValue(), dl);
+
+  LLVM_DEBUG(dbgs() << "ExpandDYNAMIC_STACKALLOC:\n");
+
+  LLVM_DEBUG(dbgs() << "Tmp1:\n";Tmp1.dump(););
+  LLVM_DEBUG(dbgs() << "Tmp2:\n";Tmp2.dump(););
+
+  LLVM_DEBUG(dbgs() << "ExpandDYNAMIC_STACKALLOC end\n");
 
   Results.push_back(Tmp1);
   Results.push_back(Tmp2);

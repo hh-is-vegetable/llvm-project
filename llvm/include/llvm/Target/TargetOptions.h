@@ -124,8 +124,8 @@ namespace llvm {
   class TargetOptions {
   public:
     TargetOptions()
-        : UnsafeFPMath(false), NoInfsFPMath(false), NoNaNsFPMath(false),
-          NoTrappingFPMath(true), NoSignedZerosFPMath(false),
+        : HasWasmMemref(false), UnsafeFPMath(false), NoInfsFPMath(false),
+          NoNaNsFPMath(false), NoTrappingFPMath(true), NoSignedZerosFPMath(false),
           ApproxFuncFPMath(false), EnableAIXExtendedAltivecABI(false),
           HonorSignDependentRoundingFPMathOption(false), NoZerosInBSS(false),
           GuaranteedTailCallOpt(false), StackSymbolOrdering(true),
@@ -152,6 +152,8 @@ namespace llvm {
     /// If greater than 0, override the default value of
     /// MCAsmInfo::BinutilsVersion.
     std::pair<int, int> BinutilsVersion{0, 0};
+
+    unsigned HasWasmMemref : 1;
 
     /// UnsafeFPMath - This flag is enabled when the
     /// -enable-unsafe-fp-math flag is specified on the command line.  When

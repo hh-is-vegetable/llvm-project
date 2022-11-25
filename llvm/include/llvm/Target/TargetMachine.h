@@ -219,6 +219,9 @@ public:
   bool requiresStructuredCFG() const { return RequireStructuredCFG; }
   void setRequiresStructuredCFG(bool Value) { RequireStructuredCFG = Value; }
 
+  bool hasWasmMemref() const { return Options.HasWasmMemref; }
+  void setHasWasmMemref(bool Value) { Options.HasWasmMemref = Value; }
+
   /// Returns the code generation relocation model. The choices are static, PIC,
   /// and dynamic-no-pic, and target default.
   Reloc::Model getRelocationModel() const;

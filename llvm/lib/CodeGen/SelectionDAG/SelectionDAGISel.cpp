@@ -1012,6 +1012,7 @@ void SelectionDAGISel::CodeGenAndEmitDAG() {
     // scheduled instructions.
     LastMBB = FuncInfo->MBB = Scheduler->EmitSchedule(FuncInfo->InsertPt);
   }
+  LLVM_DEBUG(dbgs() << "MBB"; FuncInfo->MBB->dump());
 
   // If the block was split, make sure we update any references that are used to
   // update PHI nodes later on.

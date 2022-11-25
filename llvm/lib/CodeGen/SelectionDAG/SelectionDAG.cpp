@@ -1426,6 +1426,17 @@ SDValue SelectionDAG::getConstant(const APInt &Val, const SDLoc &DL, EVT VT,
 
 SDValue SelectionDAG::getConstant(const ConstantInt &Val, const SDLoc &DL,
                                   EVT VT, bool isT, bool isO) {
+//  if (VT.isMemref()) {
+//    unsigned AddrBitWidth = getDataLayout().getPointerSizeInBits(0);
+//    APInt Int = Val.getValue();
+//    // trunc get the lowest bits
+//    if (Int.getBitWidth() > AddrBitWidth)
+//      Int = Int.trunc(AddrBitWidth);
+////    assert(APInt::isSameValue(Int, Val.getValue()));
+////    assert(!isT && "Cannot create INTTOPTR targetconstant");
+//    MVT IntVT = MVT::getIntegerVT(AddrBitWidth);
+//    return getConstant(Int, DL, IntVT);
+//  }
   assert(VT.isInteger() && "Cannot create FP integer constant!");
 
   EVT EltVT = VT.getScalarType();
@@ -1535,7 +1546,9 @@ SDValue SelectionDAG::getConstant(const ConstantInt &Val, const SDLoc &DL,
 
 SDValue SelectionDAG::getIntPtrConstant(uint64_t Val, const SDLoc &DL,
                                         bool isTarget) {
-  return getConstant(Val, DL, TLI->getPointerTy(getDataLayout()), isTarget);
+  MVT VT =  TLI->getPointerTy(getDataLayout());
+  if(VT.isMemref())VT = VT.changeTypeToInteger();
+  return getConstant(Val, DL, VT, isTarget);
 }
 
 SDValue SelectionDAG::getShiftAmountConstant(uint64_t Val, EVT VT,
@@ -1614,6 +1627,12 @@ SDValue SelectionDAG::getGlobalAddress(const GlobalValue *GV, const SDLoc &DL,
          "Cannot set target flags on target-independent globals");
 
   // Truncate (with sign-extension) the offset value to the pointer size.
+  LLVM_DEBUG(dbgs() << "The--Global type is:\n  ";GV->getType()->dump(););
+
+  LLVM_DEBUG(dbgs() << "detail information:"
+                    << "\n";GV->dump(););
+
+  LLVM_DEBUG(dbgs() << "end of SelectionDAG::getGlobalAddress\n" );
   unsigned BitWidth = getDataLayout().getPointerTypeSizeInBits(GV->getType());
   if (BitWidth < 64)
     Offset = SignExtend64(Offset, BitWidth);
@@ -5289,6 +5308,9 @@ SDValue SelectionDAG::FoldSymbolOffset(unsigned Opcode, EVT VT,
     return SDValue();
   int64_t Offset = C2->getSExtValue();
   switch (Opcode) {
+  case ISD::WASM_MEMREF_ADD:
+    assert(TM.hasWasmMemref() && "This need enable HasWasmMemref");
+    break ;
   case ISD::ADD: break;
   case ISD::SUB: Offset = -uint64_t(Offset); break;
   default: return SDValue();
@@ -5322,7 +5344,7 @@ bool SelectionDAG::isUndef(unsigned Opcode, ArrayRef<SDValue> Ops) {
   }
 }
 
-SDValue SelectionDAG::FoldConstantArithmetic(unsigned Opcode, const SDLoc &DL,
+SDValue SelectionDAG:: FoldConstantArithmetic(unsigned Opcode, const SDLoc &DL,
                                              EVT VT, ArrayRef<SDValue> Ops) {
   // If the opcode is a target-specific ISD node, there's nothing we can
   // do here and the operand rules may not line up with the below, so
@@ -5685,6 +5707,18 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
       return V;
     break;
   }
+  case ISD::WASM_MEMREF_AND:
+    assert(TM.hasWasmMemref() && "This need enable HasWasmMemref");
+    assert(VT.isMemref() &&"This operator's result should be memref");
+    assert(VT.isMemref() && N2.getValueType().isInteger()
+           && N1.getValueType().isMemref()
+           && "MEMREF_AND operator types error");
+    // fixme: shouldn't just return N2
+    if (N2CV && N2CV->isZero())
+      return N2;
+    if (N2CV && N2CV->isAllOnes())
+      return N1;
+    break;
   case ISD::AND:
     assert(VT.isInteger() && "This operator does not apply to FP types!");
     assert(N1.getValueType() == N2.getValueType() &&
@@ -5711,6 +5745,15 @@ SDValue SelectionDAG::getNode(unsigned Opcode, const SDLoc &DL, EVT VT,
         VT.getVectorElementType() == MVT::i1)
       return getNode(ISD::XOR, DL, VT, N1, N2);
     break;
+  case ISD::WASM_MEMREF_ADD:
+    assert(TM.hasWasmMemref() && "This need enable HasWasmMemref");
+    assert(VT.isMemref() &&"This operator's result should be memref");
+    assert(VT.isMemref() && N2.getValueType().isInteger()
+           && N1.getValueType().isMemref()
+           && "MEMREF_ADD operator types error");
+    if (N2CV && N2CV->isZero())
+      return N1;
+    break ;
   case ISD::MUL:
     assert(VT.isInteger() && "This operator does not apply to FP types!");
     assert(N1.getValueType() == N2.getValueType() &&
@@ -6416,6 +6459,8 @@ SDValue SelectionDAG::getMemBasePlusOffset(SDValue Base, TypeSize Offset,
                                            const SDLoc &DL,
                                            const SDNodeFlags Flags) {
   EVT VT = Base.getValueType();
+  // Base type may be different from offset type
+  if(VT.isMemref()) VT = EVT(MVT::i32);
   SDValue Index;
 
   if (Offset.isScalable())
@@ -6433,7 +6478,9 @@ SDValue SelectionDAG::getMemBasePlusOffset(SDValue Ptr, SDValue Offset,
                                            const SDNodeFlags Flags) {
   assert(Offset.getValueType().isInteger());
   EVT BasePtrVT = Ptr.getValueType();
-  return getNode(ISD::ADD, DL, BasePtrVT, Ptr, Offset, Flags);
+  auto opcode = this->TM.hasWasmMemref() && BasePtrVT.isMemref()
+                    ? ISD::WASM_MEMREF_ADD : ISD::ADD;
+  return getNode(opcode, DL, BasePtrVT, Ptr, Offset, Flags);
 }
 
 /// Returns true if memcpy source is constant data.

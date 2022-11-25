@@ -928,6 +928,8 @@ EVT TargetLoweringBase::getShiftAmountTy(EVT LHSTy, const DataLayout &DL,
     return LHSTy;
   MVT ShiftVT =
       LegalTypes ? getScalarShiftAmountTy(DL, LHSTy) : getPointerTy(DL);
+  // memref can not be a shift VT here
+  if(ShiftVT.isMemref())ShiftVT = ShiftVT.changeTypeToInteger();
   // If any possible shift value won't fit in the prefered type, just use
   // something safe. Assume it will be legalized when the shift is expanded.
   if (ShiftVT.getSizeInBits() < Log2_32_Ceil(LHSTy.getSizeInBits()))

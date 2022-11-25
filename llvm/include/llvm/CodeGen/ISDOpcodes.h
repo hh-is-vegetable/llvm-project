@@ -1244,6 +1244,21 @@ enum NodeType {
   VECREDUCE_UMAX,
   VECREDUCE_UMIN,
 
+  // MEMREF is a fatpointer
+  // WASM_MEMREF_ADD - memref + i32/64 -> memref'
+  WASM_MEMREF_ADD,
+  // WASM_MEMREF_NARROW - memref --base, size, others--> memref'
+  WASM_MEMREF_NARROW,
+  // WASM_MEMREF_FIELD - memref.base -> base;
+  // for example, memref.size -> size; memref.addr -> addr
+  WASM_MEMREF_FIELD,
+  // WASM_MEMREF_AND - memref & i32/64 -> memref'
+  WASM_MEMREF_AND,
+
+  PTRTOINT,
+  // INTTOPTR cannot happen before PTRTOINT
+  INTTOPTR,
+
 // Vector Predication
 #define BEGIN_REGISTER_VP_SDNODE(VPSDID, ...) VPSDID,
 #include "llvm/IR/VPIntrinsics.def"

@@ -3896,7 +3896,12 @@ SDValue DAGCombiner::visitMUL(SDNode *N) {
       (!VT.isVector() || Level <= AfterLegalizeVectorOps)) {
     SDLoc DL(N);
     SDValue LogBase2 = BuildLogBase2(N1, DL);
+    LLVM_DEBUG(dbgs() << "N0.getValueType:\n"
+                      << N0.getValueType().getEVTString() << "\n");
     EVT ShiftVT = getShiftAmountTy(N0.getValueType());
+    LLVM_DEBUG(dbgs() << "point1\n");
+    LLVM_DEBUG(dbgs() << "point2\n");
+
     SDValue Trunc = DAG.getZExtOrTrunc(LogBase2, DL, ShiftVT);
     return DAG.getNode(ISD::SHL, DL, VT, N0, Trunc);
   }
