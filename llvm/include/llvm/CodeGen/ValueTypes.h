@@ -131,6 +131,11 @@ namespace llvm {
       return V.SimpleTy != MVT::INVALID_SIMPLE_VALUE_TYPE;
     }
 
+    // Test if the given EVT is memref
+    bool isMemref() const {
+      return isSimple() && V.isMemref();
+    }
+
     /// Test if the given EVT is extended (as opposed to being simple).
     bool isExtended() const {
       return !isSimple();

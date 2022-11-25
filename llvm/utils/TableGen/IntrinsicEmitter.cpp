@@ -252,7 +252,8 @@ enum IIT_Info {
   IIT_PPCF128 = 52,
   IIT_V3 = 53,
   IIT_EXTERNREF = 54,
-  IIT_FUNCREF = 55
+  IIT_FUNCREF = 55,
+  IIT_MEMREF = 59,
 };
 
 static void EncodeFixedValueType(MVT::SimpleValueType VT,
@@ -290,6 +291,8 @@ static void EncodeFixedValueType(MVT::SimpleValueType VT,
     return Sig.push_back(IIT_EXTERNREF);
   case MVT::funcref:
     return Sig.push_back(IIT_FUNCREF);
+  case MVT::memref:
+    return Sig.push_back(IIT_MEMREF);
   }
 }
 

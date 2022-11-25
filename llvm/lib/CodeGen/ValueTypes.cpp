@@ -172,6 +172,7 @@ std::string EVT::getEVTString() const {
   case MVT::Untyped:   return "Untyped";
   case MVT::funcref:   return "funcref";
   case MVT::externref: return "externref";
+  case MVT::memref:    return "memref";
   }
 }
 
@@ -206,6 +207,8 @@ Type *EVT::getTypeForEVT(LLVMContext &Context) const {
   case MVT::funcref:
     // pointer to i8 addrspace(20)
     return PointerType::get(Type::getInt8Ty(Context), 20);
+  case MVT::memref:
+    return PointerType::get(StructType::create(Context), 160);
   case MVT::v1i1:
     return FixedVectorType::get(Type::getInt1Ty(Context), 1);
   case MVT::v2i1:

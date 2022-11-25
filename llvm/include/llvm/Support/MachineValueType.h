@@ -272,8 +272,10 @@ namespace llvm {
       x86amx         = 177,    // This is an X86 AMX value
       i64x8          = 178,    // 8 Consecutive GPRs (AArch64)
 
+      memref         = 179,    // WebAssembly's memref type
+
       FIRST_VALUETYPE =  1,    // This is always the beginning of the list.
-      LAST_VALUETYPE = i64x8,  // This always remains at the end of the list.
+      LAST_VALUETYPE = 191,  // This always remains at the end of the list.
       VALUETYPE_SIZE = LAST_VALUETYPE + 1,
 
       // This is the current maximum for LAST_VALUETYPE.
@@ -334,6 +336,10 @@ namespace llvm {
     bool isValid() const {
       return (SimpleTy >= MVT::FIRST_VALUETYPE &&
               SimpleTy <= MVT::LAST_VALUETYPE);
+    }
+
+    bool isMemref() const {
+      return SimpleTy == MVT::memref;
     }
 
     /// Return true if this is a FP or a vector FP type.
@@ -904,6 +910,7 @@ namespace llvm {
       case nxv1i16:
       case nxv1bf16:
       case nxv1f16: return TypeSize::Scalable(16);
+      case memref:
       case f32 :
       case i32 :
       case v32i1:
