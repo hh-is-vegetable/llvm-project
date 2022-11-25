@@ -59,9 +59,10 @@ MCCodeEmitter *llvm::createWebAssemblyMCCodeEmitter(const MCInstrInfo &MCII) {
 void WebAssemblyMCCodeEmitter::encodeInstruction(
     const MCInst &MI, raw_ostream &OS, SmallVectorImpl<MCFixup> &Fixups,
     const MCSubtargetInfo &STI) const {
+  LLVM_DEBUG(dbgs() << "encodeInstruction:\n"; MI.dump());
   uint64_t Start = OS.tell();
 
-  uint64_t Binary = getBinaryCodeForInstr(MI, Fixups, STI);
+  uint64_t Binary = getBinaryCodeForInstr(MI, Fixups, STI); // opcode binary format
   if (Binary < (1 << 8)) {
     OS << uint8_t(Binary);
   } else if (Binary < (1 << 16)) {

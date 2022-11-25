@@ -433,6 +433,8 @@ public:
     // FIXME: there is probably a cleaner way to do this.
     auto IsLoadStore = InstName.contains(".load") ||
                        InstName.contains(".store") ||
+                       InstName.contains(".msload") ||
+                       InstName.contains(".msstore") ||
                        InstName.contains("prefetch");
     auto IsAtomic = InstName.contains("atomic.");
     if (IsLoadStore || IsAtomic) {

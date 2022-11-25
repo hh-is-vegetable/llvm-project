@@ -79,6 +79,7 @@ defm : LoadPatNoOffset<i64, load, "LOAD_I64">;
 defm : LoadPatNoOffset<f32, load, "LOAD_F32">;
 defm : LoadPatNoOffset<f64, load, "LOAD_F64">;
 
+
 // Select loads with a constant offset.
 
 // Pattern with address + immediate offset
@@ -100,6 +101,7 @@ defm : LoadPatImmOff<i32, load, or_is_add, "LOAD_I32">;
 defm : LoadPatImmOff<i64, load, or_is_add, "LOAD_I64">;
 defm : LoadPatImmOff<f32, load, or_is_add, "LOAD_F32">;
 defm : LoadPatImmOff<f64, load, or_is_add, "LOAD_F64">;
+
 
 // Select loads with just a constant offset.
 multiclass LoadPatOffsetOnly<ValueType ty, SDPatternOperator kind, string inst> {
@@ -278,6 +280,7 @@ defm : StorePatNoOffset<i64, store, "STORE_I64">;
 defm : StorePatNoOffset<f32, store, "STORE_F32">;
 defm : StorePatNoOffset<f64, store, "STORE_F64">;
 
+
 // Select stores with a constant offset.
 multiclass StorePatImmOff<ValueType ty, PatFrag kind, PatFrag operand,
                           string inst> {
@@ -386,3 +389,6 @@ defm MEMORY_GROW_A#B : I<(outs rc:$dst), (ins i32imm:$flags, rc:$delta),
 
 defm : MemoryOps<I32, "32">;
 defm : MemoryOps<I64, "64">;
+
+
+// include "WebAssemblyInstrMemorySafe.td"
