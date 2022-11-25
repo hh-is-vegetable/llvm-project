@@ -117,10 +117,10 @@ WebAssemblyTargetMachine::WebAssemblyTargetMachine(
                                        "f128:64-n32:64-S128-ni:1:10:20"
                                      : "e-m:e-p:64:64-p10:8:8-p20:8:8-i64:64-"
                                        "n32:64-S128-ni:1:10:20")
-              : (TT.isOSEmscripten() ? "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-"
-                                       "f128:64-n32:64-S128-ni:1:10:20"
-                                     : "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-"
-                                       "n32:64-S128-ni:1:10:20"),
+              : (TT.isOSEmscripten() ? "e-m:e-p:32:32-p10:8:8-p20:8:8-p160:32:32-i64:64-"
+                                       "f128:64-n32:64-S128-ni:1:10:20:160"
+                                     : "e-m:e-p:32:32-p10:8:8-p20:8:8-p160:32:32-i64:64-"
+                                       "n32:64-S128-ni:1:10:20:160"),
           TT, CPU, FS, Options, getEffectiveRelocModel(RM, TT),
           getEffectiveCodeModel(CM, CodeModel::Large), OL),
       TLOF(new WebAssemblyTargetObjectFile()) {
@@ -135,6 +135,8 @@ WebAssemblyTargetMachine::WebAssemblyTargetMachine(
   this->Options.FunctionSections = true;
   this->Options.DataSections = true;
   this->Options.UniqueSectionNames = true;
+
+  this->Options.HasWasmMemref = true;
 
   initAsmInfo();
 
