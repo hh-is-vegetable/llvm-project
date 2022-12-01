@@ -12,6 +12,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
+// fixme:addr and mref can exist at the same time
+
 #include "WebAssemblyRegisterInfo.h"
 #include "MCTargetDesc/WebAssemblyMCTargetDesc.h"
 #include "WebAssemblyFrameLowering.h"
@@ -41,6 +43,7 @@ WebAssemblyRegisterInfo::getCalleeSavedRegs(const MachineFunction *) const {
   return CalleeSavedRegs;
 }
 
+// Reserved Registers are special registers
 BitVector
 WebAssemblyRegisterInfo::getReservedRegs(const MachineFunction & /*MF*/) const {
   BitVector Reserved(getNumRegs());
@@ -66,13 +69,15 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
   assert(MFI.getObjectSize(FrameIndex) != 0 &&
          "We assume that variable-sized objects have already been lowered, "
          "and don't use FrameIndex operands.");
-  Register FrameRegister = getFrameRegister(MF);
+  Register FrameRegister = getFrameRegister(MF); // TODO:here fp is just copy from sp, fix it if necessary
 
   // If this is the address operand of a load or store, make it relative to SP
   // and fold the frame offset directly in.
   unsigned AddrOperandNum = WebAssembly::getNamedOperandIdx(
       MI.getOpcode(), WebAssembly::OpName::addr);
-  if (AddrOperandNum == FIOperandNum) {
+  unsigned MemrefOperandNum = WebAssembly::getNamedOperandIdx(
+      MI.getOpcode(), WebAssembly::OpName::mref);
+  if (AddrOperandNum == FIOperandNum || MemrefOperandNum == FIOperandNum) {
     unsigned OffsetOperandNum = WebAssembly::getNamedOperandIdx(
         MI.getOpcode(), WebAssembly::OpName::off);
     assert(FrameOffset >= 0 && MI.getOperand(OffsetOperandNum).getImm() >= 0);
@@ -80,15 +85,17 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
 
     if (static_cast<uint64_t>(Offset) <= std::numeric_limits<uint32_t>::max()) {
       MI.getOperand(OffsetOperandNum).setImm(Offset);
+      // fixme: addr and mref is not the same RegisterClass
       MI.getOperand(FIOperandNum)
           .ChangeToRegister(FrameRegister, /*isDef=*/false);
       return;
     }
   }
 
-  // If this is an address being added to a constant, fold the frame offset
+  // If this is an address/memref being added to a constant, fold the frame offset
   // into the constant.
-  if (MI.getOpcode() == WebAssemblyFrameLowering::getOpcAdd(MF)) {
+  if (MI.getOpcode() == WebAssemblyFrameLowering::getOpcAdd(MF)
+      || MI.getOpcode() == WebAssemblyFrameLowering::getOpcMemrefAdd()) {
     MachineOperand &OtherMO = MI.getOperand(3 - FIOperandNum);
     if (OtherMO.isReg()) {
       Register OtherMOReg = OtherMO.getReg();
@@ -127,7 +134,8 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
         .addImm(FrameOffset);
     FIRegOperand = MRI.createVirtualRegister(PtrRC);
     BuildMI(MBB, *II, II->getDebugLoc(),
-            TII->get(WebAssemblyFrameLowering::getOpcAdd(MF)),
+            TII->get(MF.getSubtarget<WebAssemblySubtarget>().hasAddr64() ?
+                    WebAssemblyFrameLowering::getOpcAdd(MF) : WebAssemblyFrameLowering::getOpcMemrefAdd()),
             FIRegOperand)
         .addReg(FrameRegister)
         .addReg(OffsetOp);
@@ -155,5 +163,7 @@ WebAssemblyRegisterInfo::getPointerRegClass(const MachineFunction &MF,
   assert(Kind == 0 && "Only one kind of pointer on WebAssembly");
   if (MF.getSubtarget<WebAssemblySubtarget>().hasAddr64())
     return &WebAssembly::I64RegClass;
-  return &WebAssembly::I32RegClass;
+
+  //  return &WebAssembly::I32RegClass; pointer type is memref
+  return &WebAssembly::MEMREFRegClass;
 }

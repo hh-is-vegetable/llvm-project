@@ -131,6 +131,7 @@ private:
     case MVT::i64:
     case MVT::f32:
     case MVT::f64:
+    case MVT::memref:
       return VT;
     case MVT::funcref:
     case MVT::externref:
@@ -389,8 +390,8 @@ void WebAssemblyFastISel::materializeLoadStoreOperands(Address &Addr) {
       unsigned Opc = Subtarget->hasAddr64() ? WebAssembly::CONST_I64
                                             : WebAssembly::CONST_I32;
       BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc, TII.get(Opc), Reg)
-          .addImm(0);
-      Addr.setReg(Reg);
+          .addImm(0); // offset
+      Addr.setReg(Reg); // offset reg
     }
   }
 }
@@ -400,7 +401,7 @@ void WebAssemblyFastISel::addLoadStoreOperands(const Address &Addr,
                                                MachineMemOperand *MMO) {
   // Set the alignment operand (this is rewritten in SetP2AlignOperands).
   // TODO: Disable SetP2AlignOperands for FastISel and just do it here.
-  MIB.addImm(0);
+  MIB.addImm(0); // align
 
   if (const GlobalValue *GV = Addr.getGlobalValue())
     MIB.addGlobalAddress(GV, Addr.getOffset());
@@ -713,6 +714,10 @@ bool WebAssemblyFastISel::fastLowerArguments() {
       Opc = WebAssembly::ARGUMENT_externref;
       RC = &WebAssembly::EXTERNREFRegClass;
       break;
+    case MVT::memref:
+      Opc = WebAssembly::ARGUMENT_memref;
+      RC = &WebAssembly::MEMREFRegClass;
+      break;
     default:
       return false;
     }
@@ -816,6 +821,9 @@ bool WebAssemblyFastISel::selectCall(const Instruction *I) {
       break;
     case MVT::externref:
       ResultReg = createResultReg(&WebAssembly::EXTERNREFRegClass);
+      break;
+    case MVT::memref:
+      ResultReg = createResultReg(&WebAssembly::MEMREFRegClass);
       break;
     default:
       return false;
@@ -1224,6 +1232,10 @@ bool WebAssemblyFastISel::selectLoad(const Instruction *I) {
     Opc = A64 ? WebAssembly::LOAD_F64_A64 : WebAssembly::LOAD_F64_A32;
     RC = &WebAssembly::F64RegClass;
     break;
+//  case MVT::memref:
+//    Opc = WebAssembly::MSLOAD_MEMREF_A32;
+//    RC = &WebAssembly::MEMREFRegClass;
+//    break ;
   default:
     return false;
   }
@@ -1279,6 +1291,9 @@ bool WebAssemblyFastISel::selectStore(const Instruction *I) {
   case MVT::f64:
     Opc = A64 ? WebAssembly::STORE_F64_A64 : WebAssembly::STORE_F64_A32;
     break;
+//  case MVT::memref:
+//    Opc = WebAssembly::MSSTORE_MEMREF_A32;
+//    break ;
   default:
     return false;
   }
@@ -1363,6 +1378,7 @@ bool WebAssemblyFastISel::selectRet(const Instruction *I) {
   case MVT::v2f64:
   case MVT::funcref:
   case MVT::externref:
+  case MVT::memref:
     break;
   default:
     return false;
@@ -1412,9 +1428,9 @@ bool WebAssemblyFastISel::fastSelectInstruction(const Instruction *I) {
   case Instruction::BitCast:
     return selectBitCast(I);
   case Instruction::Load:
-    return selectLoad(I);
+    return TM.hasWasmMemref() ? false : selectLoad(I);
   case Instruction::Store:
-    return selectStore(I);
+    return TM.hasWasmMemref() ? false : selectStore(I);
   case Instruction::Br:
     return selectBr(I);
   case Instruction::Ret:

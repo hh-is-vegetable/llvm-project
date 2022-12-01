@@ -28,12 +28,18 @@ def SDTMrefBinary : SDTypeProfile<1, 2, [
   SDTCisVT<0, memref>, SDTCisVT<1, memref>, SDTCisInt<2>
 ]>;
 
+def SDTMrefAlloc : SDTypeProfile<1, 4, [
+  SDTCisVT<0, memref>, 
+  SDTCisInt<1>, SDTCisInt<2>, SDTCisInt<3>, SDTCisInt<4>
+]>;
+
 // mrefadd
 def mrefadd : SDNode<"ISD::WASM_MEMREF_ADD", SDTMrefBinary, []>;
 
 // mrefand
 def mrefand : SDNode<"ISD::WASM_MEMREF_AND", SDTMrefBinary, []>;
 
+def mrefalloc : SDNode<"ISD::WASM_MEMREF_ALLOC", SDTMrefAlloc, []>;
 
 // this is for memref plus i32
 def regMemrefPlusImm : PatFrag<(ops node:$mref, node:$off),
@@ -340,15 +346,30 @@ defm MEMREF_NULL : I<(outs MEMREF:$dst), (ins),
                         "memref.null\t", 0xea>,
                       Requires<[HasAddr32]>;
 
+defm MEMREF_ADD : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$val), (outs), (ins),
+                [(set MEMREF:$res, (mrefadd MEMREF:$mref, I32:$val))],
+                "memref.add\t$res, $mref, $val",
+                "memref.add\t", 0xeb>;
+
 defm MEMREF_AND : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$val), (outs), (ins),
                 [(set MEMREF:$res, (mrefand MEMREF:$mref, I32:$val))],
                 "memref.and\t$res, $mref, $val",
                 "memref.and\t", 0xec>;
 
-defm MEMREF_ADD : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$val), (outs), (ins),
-                [(set MEMREF:$res, (mrefadd MEMREF:$mref, I32:$val))],
-                "memref.add\t$res, $mref, $val",
-                "memref.add\t", 0xeb>;
+defm MEMREF_ALLOC : I<(outs MEMREF:$res), (ins I32:$addr, I32:$size, I32:$attr, I32:$info),
+                  (outs), (ins),
+                  [(set MEMREF:$res, (mrefalloc I32:$addr, I32:$size, I32:$attr, I32:$info))],
+                  "memref.alloc\t$res, $addr, $size, $attr, $info",
+                  "memref.alloc\t", 0xed>;
+
+def : Pat<(memref (mrefand (WebAssemblyWrapper tglobaladdr:$mref), I32:$val)),
+          (MEMREF_AND tglobaladdr:$mref, I32:$val)>,
+      Requires<[IsNotPIC, HasAddr32]>;
+
+def : Pat<(memref (mrefadd (WebAssemblyWrapper tglobaladdr:$mref), I32:$val)),
+          (MEMREF_ADD tglobaladdr:$mref, I32:$val)>,
+      Requires<[IsNotPIC, HasAddr32]>;
+
 
 // defm MEMREF_NARROW : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$base, I32:$size, I32:$info), 
 //                 (outs), (ins),

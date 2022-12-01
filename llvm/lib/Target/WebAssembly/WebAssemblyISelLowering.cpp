@@ -43,7 +43,7 @@ using namespace llvm;
 WebAssemblyTargetLowering::WebAssemblyTargetLowering(
     const TargetMachine &TM, const WebAssemblySubtarget &STI)
     : TargetLowering(TM), Subtarget(&STI) {
-  auto MVTPtr = Subtarget->hasAddr64() ? MVT::i64 : MVT::i32;
+  auto MVTPtr = Subtarget->hasAddr64() ? MVT::i64 : MVT::memref;
 
   // Booleans always contain 0 or 1.
   setBooleanContents(ZeroOrOneBooleanContent);
@@ -59,6 +59,7 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
   addRegisterClass(MVT::i64, &WebAssembly::I64RegClass);
   addRegisterClass(MVT::f32, &WebAssembly::F32RegClass);
   addRegisterClass(MVT::f64, &WebAssembly::F64RegClass);
+  addRegisterClass(MVT::memref, &WebAssembly::MEMREFRegClass);
   if (Subtarget->hasSIMD128()) {
     addRegisterClass(MVT::v16i8, &WebAssembly::V128RegClass);
     addRegisterClass(MVT::v8i16, &WebAssembly::V128RegClass);
@@ -71,12 +72,13 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
     addRegisterClass(MVT::externref, &WebAssembly::EXTERNREFRegClass);
     addRegisterClass(MVT::funcref, &WebAssembly::FUNCREFRegClass);
   }
+  
   // Compute derived properties from the register classes.
   computeRegisterProperties(Subtarget->getRegisterInfo());
 
   // Transform loads and stores to pointers in address space 1 to loads and
   // stores to WebAssembly global variables, outside linear memory.
-  for (auto T : {MVT::i32, MVT::i64, MVT::f32, MVT::f64}) {
+  for (auto T : {MVT::i32, MVT::i64, MVT::f32, MVT::f64, MVT::memref}) {
     setOperationAction(ISD::LOAD, T, Custom);
     setOperationAction(ISD::STORE, T, Custom);
   }
@@ -275,6 +277,7 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
   setOperationAction(ISD::STACKRESTORE, MVT::Other, Expand);
   setOperationAction(ISD::DYNAMIC_STACKALLOC, MVTPtr, Expand);
 
+  setOperationAction(ISD::FrameIndex, MVT::memref, Custom);
   setOperationAction(ISD::FrameIndex, MVT::i32, Custom);
   setOperationAction(ISD::FrameIndex, MVT::i64, Custom);
   setOperationAction(ISD::CopyToReg, MVT::Other, Custom);
@@ -353,7 +356,9 @@ MVT WebAssemblyTargetLowering::getPointerTy(const DataLayout &DL,
     return MVT::externref;
   if (AS == WebAssembly::WasmAddressSpace::WASM_ADDRESS_SPACE_FUNCREF)
     return MVT::funcref;
-  return TargetLowering::getPointerTy(DL, AS);
+//  if (AS == WebAssembly::WasmAddressSpace::WASM_ADDRESS_SPACE_MEMREF)
+  return Subtarget->hasAddr64() ? 
+    TargetLowering::getPointerTy(DL, AS) : MVT::memref;
 }
 
 MVT WebAssemblyTargetLowering::getPointerMemTy(const DataLayout &DL,
@@ -362,7 +367,9 @@ MVT WebAssemblyTargetLowering::getPointerMemTy(const DataLayout &DL,
     return MVT::externref;
   if (AS == WebAssembly::WasmAddressSpace::WASM_ADDRESS_SPACE_FUNCREF)
     return MVT::funcref;
-  return TargetLowering::getPointerMemTy(DL, AS);
+//  if (AS == WebAssembly::WasmAddressSpace::WASM_ADDRESS_SPACE_MEMREF)
+  return Subtarget->hasAddr64() ? 
+    TargetLowering::getPointerTy(DL, AS) : MVT::memref;
 }
 
 TargetLowering::AtomicExpansionKind
@@ -1725,7 +1732,7 @@ WebAssemblyTargetLowering::LowerGlobalTLSAddress(SDValue Op,
 
     MVT PtrVT = getPointerTy(DAG.getDataLayout());
     auto GlobalGet = PtrVT == MVT::i64 ? WebAssembly::GLOBAL_GET_I64
-                                       : WebAssembly::GLOBAL_GET_I32;
+                                       : WebAssembly::GLOBAL_GET_MEMREF;
     const char *BaseName = MF.createExternalSymbolName("__tls_base");
 
     SDValue BaseAddr(
@@ -1760,8 +1767,15 @@ SDValue WebAssemblyTargetLowering::LowerGlobalAddress(SDValue Op,
   if (!WebAssembly::isValidAddressSpace(GA->getAddressSpace()))
     fail(DL, DAG, "Invalid address space for WebAssembly target");
 
+  LLVM_DEBUG(dbgs() << "WebAssemblyTargetLowering::LowerGlobalAddress: " 
+                    << "\n";GA->dump(););
+
+  LLVM_DEBUG(dbgs() << "\n " << "MVT:" << VT.getEVTString());
+  LLVM_DEBUG(dbgs() << "end of LowerGlobalAddress\n" );
+
   unsigned OperandFlags = 0;
   if (isPositionIndependent()) {
+    LLVM_DEBUG(dbgs() << "here is in isPositionIndependent\n" );
     const GlobalValue *GV = GA->getGlobal();
     if (getTargetMachine().shouldAssumeDSOLocal(*GV->getParent(), GV)) {
       MachineFunction &MF = DAG.getMachineFunction();

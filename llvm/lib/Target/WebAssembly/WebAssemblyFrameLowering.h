@@ -65,6 +65,8 @@ public:
   static unsigned getOpcAdd(const MachineFunction &MF);
   static unsigned getOpcSub(const MachineFunction &MF);
   static unsigned getOpcAnd(const MachineFunction &MF);
+  static unsigned getOpcMemrefAdd();
+  static unsigned getOpcMemrefAnd();
   static unsigned getOpcGlobGet(const MachineFunction &MF);
   static unsigned getOpcGlobSet(const MachineFunction &MF);
 

@@ -46,6 +46,7 @@ bool WebAssemblyInstrInfo::isReallyTriviallyReMaterializable(
   case WebAssembly::CONST_I64:
   case WebAssembly::CONST_F32:
   case WebAssembly::CONST_F64:
+  case WebAssembly::MEMREF_NULL:
     // isReallyTriviallyReMaterializableGeneric misses these because of the
     // ARGUMENTS implicit def, so we manualy override it here.
     return true;
@@ -81,6 +82,8 @@ void WebAssemblyInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     CopyOpcode = WebAssembly::COPY_FUNCREF;
   else if (RC == &WebAssembly::EXTERNREFRegClass)
     CopyOpcode = WebAssembly::COPY_EXTERNREF;
+  else if (RC == &WebAssembly::MEMREFRegClass)
+    CopyOpcode = WebAssembly::COPY_MEMREF;
   else
     llvm_unreachable("Unexpected register class");
 

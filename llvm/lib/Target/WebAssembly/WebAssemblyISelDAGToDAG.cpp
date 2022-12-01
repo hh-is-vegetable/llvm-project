@@ -108,7 +108,7 @@ void WebAssemblyDAGToDAGISel::Select(SDNode *Node) {
 
   MVT PtrVT = TLI->getPointerTy(CurDAG->getDataLayout());
   auto GlobalGetIns = PtrVT == MVT::i64 ? WebAssembly::GLOBAL_GET_I64
-                                        : WebAssembly::GLOBAL_GET_I32;
+                                        : WebAssembly::GLOBAL_GET_MEMREF;
 
   // Few custom selection stuff.
   SDLoc DL(Node);

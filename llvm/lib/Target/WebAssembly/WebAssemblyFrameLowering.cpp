@@ -76,6 +76,7 @@ WebAssemblyFrameLowering::getLocalForStackObject(MachineFunction &MF,
   MFI.setStackID(FrameIndex, TargetStackID::WasmLocal);
   // Abuse SP offset to record the index of the first local in the object.
   unsigned Local = FuncInfo->getParams().size() + FuncInfo->getLocals().size();
+  // Local is the WebAssembly local index for local.get/set
   MFI.setObjectOffset(FrameIndex, Local);
   // Allocate WebAssembly locals for each non-aggregate component of the
   // allocation.
@@ -192,34 +193,43 @@ WebAssemblyFrameLowering::getOpcConst(const MachineFunction &MF) {
 
 unsigned WebAssemblyFrameLowering::getOpcAdd(const MachineFunction &MF) {
   return MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()
-             ? WebAssembly::ADD_I64
-             : WebAssembly::ADD_I32;
+            ? WebAssembly::ADD_I64
+            : WebAssembly::ADD_I32;
 }
 
 unsigned WebAssemblyFrameLowering::getOpcSub(const MachineFunction &MF) {
   return MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()
-             ? WebAssembly::SUB_I64
-             : WebAssembly::SUB_I32;
+            ? WebAssembly::SUB_I64
+            : WebAssembly::SUB_I32;
 }
 
 unsigned WebAssemblyFrameLowering::getOpcAnd(const MachineFunction &MF) {
   return MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()
-             ? WebAssembly::AND_I64
-             : WebAssembly::AND_I32;
+            ? WebAssembly::AND_I64
+            : WebAssembly::AND_I32;
 }
+
+unsigned WebAssemblyFrameLowering::getOpcMemrefAdd() {
+  return WebAssembly::MEMREF_ADD;
+}
+
+unsigned WebAssemblyFrameLowering::getOpcMemrefAnd() {
+  return WebAssembly::MEMREF_AND;
+}
+
 
 unsigned
 WebAssemblyFrameLowering::getOpcGlobGet(const MachineFunction &MF) {
   return MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()
              ? WebAssembly::GLOBAL_GET_I64
-             : WebAssembly::GLOBAL_GET_I32;
+             : WebAssembly::GLOBAL_GET_MEMREF;
 }
 
 unsigned
 WebAssemblyFrameLowering::getOpcGlobSet(const MachineFunction &MF) {
   return MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()
              ? WebAssembly::GLOBAL_SET_I64
-             : WebAssembly::GLOBAL_SET_I32;
+             : WebAssembly::GLOBAL_SET_MEMREF;
 }
 
 void WebAssemblyFrameLowering::writeSPToGlobal(
@@ -291,23 +301,34 @@ void WebAssemblyFrameLowering::emitPrologue(MachineFunction &MF,
     BuildMI(MBB, InsertPt, DL, TII->get(WebAssembly::COPY), BasePtr)
         .addReg(SPReg);
   }
+  // memref.add / sub.
   if (StackSize) {
     // Subtract the frame size
-    Register OffsetReg = MRI.createVirtualRegister(PtrRC);
+    Register OffsetReg = MRI.createVirtualRegister(
+        MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()?
+        &WebAssembly::I64RegClass : &WebAssembly::I32RegClass);
+    // i32/64.const for sub. OffSetReg is i32/64. OffsetReg is dst reg.
     BuildMI(MBB, InsertPt, DL, TII->get(getOpcConst(MF)), OffsetReg)
-        .addImm(StackSize);
-    BuildMI(MBB, InsertPt, DL, TII->get(getOpcSub(MF)), getSPReg(MF))
+        .addImm(-StackSize);
+    BuildMI(MBB, InsertPt, DL, TII->get(
+      MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()? getOpcAdd(MF)
+        : getOpcMemrefAdd()), getSPReg(MF))
         .addReg(SPReg)
         .addReg(OffsetReg);
   }
+  // mmemref.and memref, i32
   if (HasBP) {
-    Register BitmaskReg = MRI.createVirtualRegister(PtrRC);
+    Register BitmaskReg = MRI.createVirtualRegister(
+        MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()?
+        &WebAssembly::I64RegClass : &WebAssembly::I32RegClass);
     Align Alignment = MFI.getMaxAlign();
     BuildMI(MBB, InsertPt, DL, TII->get(getOpcConst(MF)), BitmaskReg)
         .addImm((int64_t) ~(Alignment.value() - 1));
-    BuildMI(MBB, InsertPt, DL, TII->get(getOpcAnd(MF)), getSPReg(MF))
-        .addReg(getSPReg(MF))
-        .addReg(BitmaskReg);
+    BuildMI(MBB, InsertPt, DL, TII->get(
+      MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()? getOpcAnd(MF)
+        : getOpcMemrefAnd()), getSPReg(MF))
+        .addReg(getSPReg(MF)) //memref
+        .addReg(BitmaskReg); //i32
   }
   if (hasFP(MF)) {
     // Unlike most conventional targets (where FP points to the saved FP),
@@ -343,16 +364,21 @@ void WebAssemblyFrameLowering::emitEpilogue(MachineFunction &MF,
     auto FI = MF.getInfo<WebAssemblyFunctionInfo>();
     SPReg = FI->getBasePointerVreg();
   } else if (StackSize) {
-    const TargetRegisterClass *PtrRC =
-        MRI.getTargetRegisterInfo()->getPointerRegClass(MF);
-    Register OffsetReg = MRI.createVirtualRegister(PtrRC);
+    const TargetRegisterClass *PtrModifyRC =
+        MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()?
+        &WebAssembly::I64RegClass : &WebAssembly::MEMREFRegClass;
+    const TargetRegisterClass *OffsetRC = MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()?
+                        &WebAssembly::I64RegClass : &WebAssembly::I32RegClass;
+    Register OffsetReg = MRI.createVirtualRegister(OffsetRC);
     BuildMI(MBB, InsertPt, DL, TII->get(getOpcConst(MF)), OffsetReg)
         .addImm(StackSize);
     // In the epilog we don't need to write the result back to the SP32/64
     // physreg because it won't be used again. We can use a stackified register
     // instead.
-    SPReg = MRI.createVirtualRegister(PtrRC);
-    BuildMI(MBB, InsertPt, DL, TII->get(getOpcAdd(MF)), SPReg)
+    SPReg = MRI.createVirtualRegister(PtrModifyRC);
+    BuildMI(MBB, InsertPt, DL, TII->get(
+      MF.getSubtarget<WebAssemblySubtarget>().hasAddr64()? getOpcAdd(MF)
+        : getOpcMemrefAdd()), SPReg)
         .addReg(SPFPReg)
         .addReg(OffsetReg);
   } else {
