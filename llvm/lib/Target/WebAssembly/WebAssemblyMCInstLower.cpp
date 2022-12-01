@@ -30,6 +30,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
+#define DEBUG_TYPE "mcInstLower"
+
 using namespace llvm;
 
 // This disables the removal of registers when lowering into MC, as required
@@ -170,6 +172,8 @@ static wasm::ValType getType(const TargetRegisterClass *RC) {
     return wasm::ValType::EXTERNREF;
   if (RC == &WebAssembly::FUNCREFRegClass)
     return wasm::ValType::FUNCREF;
+  if (RC == &WebAssembly::MEMREFRegClass)
+    return wasm::ValType::MEMREF;
   llvm_unreachable("Unexpected register class");
 }
 
@@ -191,6 +195,7 @@ void WebAssemblyMCInstLower::lower(const MachineInstr *MI,
   unsigned NumVariadicDefs = MI->getNumExplicitDefs() - Desc.getNumDefs();
   for (unsigned I = 0, E = MI->getNumOperands(); I != E; ++I) {
     const MachineOperand &MO = MI->getOperand(I);
+    LLVM_DEBUG(dbgs() << "lower MI:\n"; MI->dump(); dbgs() << "MO:\n"; MO.dump());
 
     MCOperand MCOp;
     switch (MO.getType()) {

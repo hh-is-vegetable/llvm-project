@@ -25,7 +25,9 @@
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Support/Debug.h"
 
+#define DEBUG_TYPE "passes"
 using namespace llvm;
 using namespace ore;
 
@@ -69,6 +71,7 @@ bool MachineFunctionPass::runOnFunction(Function &F) {
   if (ShouldEmitSizeRemarks)
     CountBefore = MF.getInstructionCount();
 
+  LLVM_DEBUG(dbgs() << "\t\tcoming Pass Name:\n" << getPassName() << "\n");
   bool RV = runOnMachineFunction(MF);
 
   if (ShouldEmitSizeRemarks) {

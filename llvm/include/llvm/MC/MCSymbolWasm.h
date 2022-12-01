@@ -27,6 +27,7 @@ class MCSymbolWasm : public MCSymbol {
   wasm::WasmSignature *Signature = nullptr;
   Optional<wasm::WasmGlobalType> GlobalType;
   Optional<wasm::WasmTableType> TableType;
+  Optional<uint64_t> GlobalSize;
 
   /// An expression describing how to calculate the size of a symbol. If a
   /// symbol has no size this field will be NULL.
@@ -133,6 +134,12 @@ public:
     return GlobalType.getValue();
   }
   void setGlobalType(wasm::WasmGlobalType GT) { GlobalType = GT; }
+
+  void setGlobalSize(uint64_t size) { GlobalSize = size; }
+  uint64_t getGlobalSize() const {
+//    assert(GlobalSize.hasValue() && "GlobalSize has no value");
+    return GlobalSize.getValueOr(0);
+  }
 
   bool hasTableType() const { return TableType.hasValue(); }
   const wasm::WasmTableType &getTableType() const {

@@ -38,6 +38,8 @@ Optional<wasm::ValType> WebAssembly::parseType(StringRef Type) {
     return wasm::ValType::FUNCREF;
   if (Type == "externref")
     return wasm::ValType::EXTERNREF;
+  if (Type == "memref")
+    return wasm::ValType::MEMREF;
   return Optional<wasm::ValType>();
 }
 
@@ -51,6 +53,7 @@ WebAssembly::BlockType WebAssembly::parseBlockType(StringRef Type) {
       .Case("v128", WebAssembly::BlockType::V128)
       .Case("funcref", WebAssembly::BlockType::Funcref)
       .Case("externref", WebAssembly::BlockType::Externref)
+      .Case("memref", WebAssembly::BlockType::Memref)
       .Case("void", WebAssembly::BlockType::Void)
       .Default(WebAssembly::BlockType::Invalid);
 }
@@ -68,6 +71,7 @@ MVT WebAssembly::parseMVT(StringRef Type) {
       .Case("v2i64", MVT::v2i64)
       .Case("funcref", MVT::funcref)
       .Case("externref", MVT::externref)
+      .Case("memref", MVT::memref)
       .Default(MVT::INVALID_SIMPLE_VALUE_TYPE);
 }
 
@@ -91,6 +95,8 @@ const char *WebAssembly::anyTypeToString(unsigned Type) {
     return "externref";
   case wasm::WASM_TYPE_FUNC:
     return "func";
+  case wasm::WASM_TYPE_MEMREF:
+    return "memref";
   case wasm::WASM_TYPE_NORESULT:
     return "void";
   default:
@@ -142,6 +148,8 @@ wasm::ValType WebAssembly::toValType(MVT Type) {
     return wasm::ValType::FUNCREF;
   case MVT::externref:
     return wasm::ValType::EXTERNREF;
+  case MVT::memref:
+    return wasm::ValType::MEMREF;
   default:
     llvm_unreachable("unexpected type");
   }
@@ -163,6 +171,8 @@ wasm::ValType WebAssembly::regClassToValType(unsigned RC) {
     return wasm::ValType::FUNCREF;
   case WebAssembly::EXTERNREFRegClassID:
     return wasm::ValType::EXTERNREF;
+  case WebAssembly::MEMREFRegClassID:
+    return wasm::ValType::MEMREF;
   default:
     llvm_unreachable("unexpected type");
   }

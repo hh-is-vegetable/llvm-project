@@ -595,6 +595,7 @@ void ScalarEnumerationTraits<WasmYAML::ValueType>::enumeration(
   ECase(FUNCREF);
   ECase(EXTERNREF);
   ECase(FUNC);
+  ECase(MEMREF);
 #undef ECase
 }
 

@@ -577,8 +577,8 @@ createUndefinedGlobal(StringRef name, llvm::wasm::WasmGlobalType *type) {
 static InputGlobal *createGlobal(StringRef name, bool isMutable) {
   llvm::wasm::WasmGlobal wasmGlobal;
   bool is64 = config->is64.getValueOr(false);
-  wasmGlobal.Type = {uint8_t(is64 ? WASM_TYPE_I64 : WASM_TYPE_I32), isMutable};
-  wasmGlobal.InitExpr = intConst(0, is64);
+  wasmGlobal.Type = {uint8_t(is64 ? WASM_TYPE_I64 : WASM_TYPE_MEMREF), isMutable};
+  wasmGlobal.InitExpr = is64 ? intConst(0, is64) : memrefAlloc(0, 0, 0, 0, is64);
   wasmGlobal.SymbolName = name;
   return make<InputGlobal>(wasmGlobal, nullptr);
 }
@@ -603,10 +603,13 @@ static void createSyntheticSymbols() {
   static WasmSignature i64ArgSignature = {{}, {ValType::I64}};
   static llvm::wasm::WasmGlobalType globalTypeI32 = {WASM_TYPE_I32, false};
   static llvm::wasm::WasmGlobalType globalTypeI64 = {WASM_TYPE_I64, false};
+  static llvm::wasm::WasmGlobalType globalTypeMEMREF = {WASM_TYPE_MEMREF, false};
   static llvm::wasm::WasmGlobalType mutableGlobalTypeI32 = {WASM_TYPE_I32,
                                                             true};
   static llvm::wasm::WasmGlobalType mutableGlobalTypeI64 = {WASM_TYPE_I64,
                                                             true};
+  static llvm::wasm::WasmGlobalType mutableGlobalTypeMEMREF = {WASM_TYPE_MEMREF,
+                                                               true};
   WasmSym::callCtors = symtab->addSyntheticFunction(
       "__wasm_call_ctors", WASM_SYMBOL_VISIBILITY_HIDDEN,
       make<SyntheticFunction>(nullSignature, "__wasm_call_ctors"));
@@ -617,13 +620,13 @@ static void createSyntheticSymbols() {
     WasmSym::stackPointer =
         createUndefinedGlobal("__stack_pointer", config->is64.getValueOr(false)
                                                      ? &mutableGlobalTypeI64
-                                                     : &mutableGlobalTypeI32);
+                                                     : &mutableGlobalTypeMEMREF);
     // For PIC code, we import two global variables (__memory_base and
     // __table_base) from the environment and use these as the offset at
     // which to load our static data and function table.
     // See:
     // https://github.com/WebAssembly/tool-conventions/blob/main/DynamicLinking.md
-    auto *globalType = is64 ? &globalTypeI64 : &globalTypeI32;
+    auto *globalType = is64 ? &globalTypeI64 : &mutableGlobalTypeMEMREF;
     WasmSym::memoryBase = createUndefinedGlobal("__memory_base", globalType);
     WasmSym::tableBase = createUndefinedGlobal("__table_base", globalType);
     WasmSym::memoryBase->markLive();

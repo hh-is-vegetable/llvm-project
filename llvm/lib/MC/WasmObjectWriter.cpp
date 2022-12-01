@@ -951,6 +951,12 @@ void WasmObjectWriter::writeGlobalSection(ArrayRef<wasm::WasmGlobal> Globals) {
     case wasm::WASM_TYPE_EXTERNREF:
       writeValueType(wasm::ValType::EXTERNREF);
       break;
+    case wasm::WASM_TYPE_MEMREF:
+      encodeSLEB128(0, W->OS); // addr
+      encodeSLEB128(Global.InitExpr.Value.Memref.size, W->OS); // size
+      encodeSLEB128(0, W->OS); // attr
+      encodeSLEB128(0, W->OS); // info
+      break ;
     default:
       llvm_unreachable("unexpected type");
     }
@@ -1676,6 +1682,11 @@ uint64_t WasmObjectWriter::writeOneObject(MCAssembler &Asm,
             break;
           case wasm::WASM_TYPE_EXTERNREF:
             Global.InitExpr.Opcode = wasm::WASM_OPCODE_REF_NULL;
+            break;
+          case wasm::WASM_TYPE_MEMREF:
+            Global.InitExpr.Opcode = wasm::WASM_OPCODE_MEMREF_ALLOC;
+            Global.InitExpr.Value.Memref.size = cast<MCConstantExpr>(WS.getSize())->getValue();
+            Global.SymbolName = WS.getName();
             break;
           default:
             llvm_unreachable("unexpected type");

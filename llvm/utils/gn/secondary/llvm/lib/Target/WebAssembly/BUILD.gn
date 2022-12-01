@@ -40,6 +40,7 @@ static_library("LLVMWebAssemblyCodeGen") {
     "WebAssemblyDebugValueManager.cpp",
     "WebAssemblyExceptionInfo.cpp",
     "WebAssemblyExplicitLocals.cpp",
+    "WebAssemblyDealGlobalAddress.cpp"
     "WebAssemblyFastISel.cpp",
     "WebAssemblyFixBrTableDefaults.cpp",
     "WebAssemblyFixFunctionBitcasts.cpp",

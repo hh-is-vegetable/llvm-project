@@ -192,6 +192,13 @@ static Error readInitExpr(wasm::WasmInitExpr &Expr,
     }
     break;
   }
+  case wasm::WASM_OPCODE_MEMREF_ALLOC: {
+    Expr.Value.Memref.addr = readVarint32(Ctx);
+    Expr.Value.Memref.size = readVarint32(Ctx);
+    Expr.Value.Memref.attr = readVarint32(Ctx);
+    Expr.Value.Memref.info = readVarint32(Ctx);
+    break;
+  }
   default:
     return make_error<GenericBinaryError>("invalid opcode in init_expr",
                                           object_error::parse_failed);

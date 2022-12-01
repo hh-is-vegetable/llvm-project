@@ -54,6 +54,17 @@ inline WasmInitExpr intConst(uint64_t value, bool is64) {
   return ie;
 }
 
+inline WasmInitExpr memrefAlloc(uint64_t addr, uint64_t size, uint64_t attr, uint64_t info, bool is64) {
+  assert(!is64 && "memref does not support 64bit address now");
+  WasmInitExpr ie;
+  ie.Opcode = llvm::wasm::WASM_OPCODE_MEMREF_ALLOC;
+  ie.Value.Memref.addr = addr;
+  ie.Value.Memref.size = size;
+  ie.Value.Memref.attr = attr;
+  ie.Value.Memref.info = info;
+  return ie;
+}
+
 class InputGlobal : public InputElement {
 public:
   InputGlobal(const WasmGlobal &g, ObjFile *f)
@@ -63,7 +74,12 @@ public:
   const WasmInitExpr &getInitExpr() const { return initExpr; }
 
   void setPointerValue(uint64_t value) {
-    initExpr = intConst(value, config->is64.getValueOr(false));
+    bool is64 = config->is64.getValueOr(false);
+    initExpr = is64 ? intConst(value, config->is64.getValueOr(false)) : memrefAlloc(value, 0, 0, 0, is64);
+  }
+
+  void setMemrefVlaue(uint64_t addr, uint64_t size , uint64_t attr, uint64_t info) {
+    initExpr = memrefAlloc(addr, size, attr, info, config->is64.getValueOr(false));
   }
 
 private:

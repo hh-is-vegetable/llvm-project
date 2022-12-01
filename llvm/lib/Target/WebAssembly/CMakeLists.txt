@@ -24,6 +24,7 @@ add_llvm_target(WebAssemblyCodeGen
   WebAssemblyDebugValueManager.cpp
   WebAssemblyLateEHPrepare.cpp
   WebAssemblyExceptionInfo.cpp
+  WebAssemblyDealGlobalAddress.cpp
   WebAssemblyExplicitLocals.cpp
   WebAssemblyFastISel.cpp
   WebAssemblyFixBrTableDefaults.cpp

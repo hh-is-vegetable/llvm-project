@@ -33,6 +33,11 @@ def int_wasm_ref_null_extern : Intrinsic<[llvm_externref_ty], [], [IntrNoMem]>;
 def int_wasm_ref_null_func : Intrinsic<[llvm_funcref_ty], [], [IntrNoMem]>;
 
 //===----------------------------------------------------------------------===//
+// memref.null intrinsics
+//===----------------------------------------------------------------------===//
+def int_wasm_memref_null : Intrinsic<[llvm_memref_ty], [], [IntrNoMem]>;
+
+//===----------------------------------------------------------------------===//
 // Table intrinsics
 //===----------------------------------------------------------------------===//
 // Query the current table size, and increase the current table size.

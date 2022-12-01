@@ -486,8 +486,9 @@ std::string SDNode::getOperationName(const SelectionDAG *G) const {
   case ISD::WASM_MEMREF_NARROW:              return "memref_narrow";
   case ISD::WASM_MEMREF_FIELD:               return "memref_field";
   case ISD::WASM_MEMREF_AND:                 return "memref_and";
-  case ISD::PTRTOINT:                        return "ptrtoint";
-  case ISD::INTTOPTR:                        return "inttoptr";
+  case ISD::WASM_MEMREF_ALLOC:               return "memref_alloc";
+//  case ISD::PTRTOINT:                        return "ptrtoint";
+//  case ISD::INTTOPTR:                        return "inttoptr";
 
     // Vector Predication
 #define BEGIN_REGISTER_VP_SDNODE(SDID, LEGALARG, NAME, ...)                    \

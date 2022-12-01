@@ -221,6 +221,10 @@ static void setGlobalPtr(DefinedGlobal *g, uint64_t memoryPtr) {
   g->global->setPointerValue(memoryPtr);
 }
 
+static void setGlobalMemref(DefinedGlobal *g, uint64_t memoryPtr, uint64_t size = 0 , uint64_t attr = 0, uint64_t info = 0) {
+  g->global->setMemrefVlaue(memoryPtr, size, attr, info);
+}
+
 // Fix the memory layout of the output binary.  This assigns memory offsets
 // to each of the input data sections as well as the explicit stack region.
 // The default memory layout is as follows, from low to high.
@@ -246,7 +250,7 @@ void Writer::layoutMemory() {
     log("mem: stack size  = " + Twine(config->zStackSize));
     log("mem: stack base  = " + Twine(memoryPtr));
     memoryPtr += config->zStackSize;
-    setGlobalPtr(cast<DefinedGlobal>(WasmSym::stackPointer), memoryPtr);
+    setGlobalMemref(cast<DefinedGlobal>(WasmSym::stackPointer), memoryPtr, config->zStackSize); // lower bound is memoryPtr-size
     log("mem: stack top   = " + Twine(memoryPtr));
   };
 

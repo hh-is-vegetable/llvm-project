@@ -35,6 +35,7 @@ enum class BlockType : unsigned {
   V128 = unsigned(wasm::ValType::V128),
   Externref = unsigned(wasm::ValType::EXTERNREF),
   Funcref = unsigned(wasm::ValType::FUNCREF),
+  Memref = unsigned(wasm::ValType::MEMREF),
   // Multivalue blocks (and other non-void blocks) are only emitted when the
   // blocks will never be exited and are at the ends of functions (see
   // WebAssemblyCFGStackify::fixEndsAtEndOfFunction). They also are never made
@@ -55,6 +56,8 @@ enum WasmAddressSpace : unsigned {
   WASM_ADDRESS_SPACE_EXTERNREF = 10,
   // A non-integral address space for funcref values
   WASM_ADDRESS_SPACE_FUNCREF = 20,
+
+  WASM_ADDRESS_SPACE_MEMREF = 160,
 };
 
 inline bool isDefaultAddressSpace(unsigned AS) {
@@ -78,6 +81,12 @@ inline bool isExternrefType(const Type *Ty) {
 }
 inline bool isRefType(const Type *Ty) {
   return isFuncrefType(Ty) || isExternrefType(Ty);
+}
+
+inline bool isMemRef(const Type *Ty) {
+  return isa<PointerType>(Ty) &&
+         Ty->getPointerAddressSpace() ==
+             WasmAddressSpace::WASM_ADDRESS_SPACE_MEMREF;
 }
 
 // Convert StringRef to ValType / HealType / BlockType
