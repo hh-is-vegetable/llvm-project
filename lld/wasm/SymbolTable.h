@@ -56,6 +56,7 @@ public:
   Symbol *addDefinedData(StringRef name, uint32_t flags, InputFile *file,
                          InputChunk *segment, uint64_t address, uint64_t size);
   Symbol *addDefinedGlobal(StringRef name, uint32_t flags, InputFile *file,
+                           InputChunk *segment, uint64_t value, uint64_t  size,
                            InputGlobal *g);
   Symbol *addDefinedTag(StringRef name, uint32_t flags, InputFile *file,
                         InputTag *t);

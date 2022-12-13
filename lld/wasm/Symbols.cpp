@@ -130,6 +130,8 @@ InputChunk *Symbol::getChunk() const {
       return f->stubFunction->function;
   if (auto *d = dyn_cast<DefinedData>(this))
     return d->segment;
+  if (auto *g = dyn_cast<DefinedGlobal>(this))
+    return g->segment; // if no segment, the default value is nullptr
   return nullptr;
 }
 
@@ -140,8 +142,10 @@ bool Symbol::isDiscarded() const {
 }
 
 bool Symbol::isLive() const {
-  if (auto *g = dyn_cast<DefinedGlobal>(this))
+  if (auto *g = dyn_cast<DefinedGlobal>(this)) {
+    if(g->segment) return g->segment->live & g->global->live;
     return g->global->live;
+  }
   if (auto *t = dyn_cast<DefinedTag>(this))
     return t->tag->live;
   if (auto *t = dyn_cast<DefinedTable>(this))
@@ -355,6 +359,30 @@ DefinedGlobal::DefinedGlobal(StringRef name, uint32_t flags, InputFile *file,
     : GlobalSymbol(name, DefinedGlobalKind, flags, file,
                    global ? &global->getType() : nullptr),
       global(global) {}
+
+DefinedGlobal::DefinedGlobal(StringRef name, uint32_t flags, InputFile *file,
+              InputChunk *segment, uint64_t value, uint64_t size, InputGlobal *global)
+    : GlobalSymbol(name, DefinedGlobalKind, flags, file,
+                   global ? &global->getType() : nullptr),
+      global(global), value(value), segment(segment), size(size){}
+
+void DefinedGlobal::setVA(uint64_t value_) {
+  LLVM_DEBUG(dbgs() << "setVA " << name << " -> " << value_ << "\n");
+  assert(!segment);
+  value = value_;
+}
+
+uint64_t DefinedGlobal::getVA() const {
+  LLVM_DEBUG(dbgs() << "getVA: " << getName() << "\n");
+  // In the shared memory case, TLS symbols are relative to the start of the TLS
+  // output segment (__tls_base).  When building without shared memory, TLS
+  // symbols absolute, just like non-TLS.
+  if (isTLS() && config->sharedMemory)
+    return segment->getChunkOffset(value) + value;
+  if (segment)
+    return segment->getVA(value);
+  return value;
+}
 
 uint32_t TagSymbol::getTagIndex() const {
   if (auto *f = dyn_cast<DefinedTag>(this))

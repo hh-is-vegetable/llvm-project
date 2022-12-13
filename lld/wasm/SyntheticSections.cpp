@@ -483,7 +483,7 @@ void GlobalSection::writeBody() {
   for (const DefinedData *sym : dataAddressGlobals) {
     WasmGlobalType type{itype, false};
     writeGlobalType(os, type);
-    writeInitExpr(os, intConst(sym->getVA(), is64));
+    writeInitExpr(os, memrefAlloc(sym->getVA(), sym->getSize(), 0, 0, is64));
   }
 }
 

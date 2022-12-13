@@ -352,11 +352,23 @@ public:
   DefinedGlobal(StringRef name, uint32_t flags, InputFile *file,
                 InputGlobal *global);
 
+  DefinedGlobal(StringRef name, uint32_t flags, InputFile *f,
+                InputChunk *segment, uint64_t value, uint64_t size,
+                InputGlobal *global);
+
   static bool classof(const Symbol *s) {
     return s->kind() == DefinedGlobalKind;
   }
 
-  InputGlobal *global;
+  uint64_t getVA() const;
+  void setVA(uint64_t va);
+  uint64_t getSize() const {return size;}
+
+  InputGlobal *global = nullptr;
+  uint64_t  value; // like DefinedData.value
+  InputChunk *segment = nullptr;
+protected:
+  uint64_t size;
 };
 
 class UndefinedGlobal : public GlobalSymbol {
@@ -627,7 +639,7 @@ union SymbolUnion {
 // It is important to keep the size of SymbolUnion small for performance and
 // memory usage reasons. 96 bytes is a soft limit based on the size of
 // UndefinedFunction on a 64-bit system.
-static_assert(sizeof(SymbolUnion) <= 120, "SymbolUnion too large");
+static_assert(sizeof(SymbolUnion) <= 2*96, "SymbolUnion too large");
 
 void printTraceSymbol(Symbol *sym);
 void printTraceSymbolUndefined(StringRef name, const InputFile* file);

@@ -383,7 +383,9 @@ Symbol *SymbolTable::addDefinedData(StringRef name, uint32_t flags,
 }
 
 Symbol *SymbolTable::addDefinedGlobal(StringRef name, uint32_t flags,
-                                      InputFile *file, InputGlobal *global) {
+                                      InputFile *file, InputChunk *segment,
+                                      uint64_t value, uint64_t size,
+                                      InputGlobal *global) {
   LLVM_DEBUG(dbgs() << "addDefinedGlobal:" << name << "\n");
 
   Symbol *s;
@@ -391,7 +393,7 @@ Symbol *SymbolTable::addDefinedGlobal(StringRef name, uint32_t flags,
   std::tie(s, wasInserted) = insert(name, file);
 
   auto replaceSym = [&]() {
-    replaceSymbol<DefinedGlobal>(s, name, flags, file, global);
+    replaceSymbol<DefinedGlobal>(s, name, flags, file, segment, value, size, global);
   };
 
   if (wasInserted || s->isLazy()) {
@@ -399,7 +401,7 @@ Symbol *SymbolTable::addDefinedGlobal(StringRef name, uint32_t flags,
     return s;
   }
 
-  checkGlobalType(s, file, &global->getType());
+    checkGlobalType(s, file, &global->getType());
 
   if (shouldReplace(s, file, flags))
     replaceSym();

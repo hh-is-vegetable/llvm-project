@@ -632,23 +632,26 @@ Error WasmObjectFile::parseLinkingSectionSymtab(ReadContext &Ctx) {
       break;
 
     case wasm::WASM_SYMBOL_TYPE_GLOBAL:
-      Info.ElementIndex = readVaruint32(Ctx);
-      if (!isValidGlobalIndex(Info.ElementIndex) ||
-          IsDefined != isDefinedGlobalIndex(Info.ElementIndex))
-        return make_error<GenericBinaryError>("invalid global symbol index",
-                                              object_error::parse_failed);
-      if (!IsDefined && (Info.Flags & wasm::WASM_SYMBOL_BINDING_MASK) ==
-                            wasm::WASM_SYMBOL_BINDING_WEAK)
-        return make_error<GenericBinaryError>("undefined weak global symbol",
-                                              object_error::parse_failed);
-      if (IsDefined) {
+      if (IsDefined) { // normal global is mapped to DataRef
         Info.Name = readString(Ctx);
-        unsigned GlobalIndex = Info.ElementIndex - NumImportedGlobals;
-        wasm::WasmGlobal &Global = Globals[GlobalIndex];
-        GlobalType = &Global.Type;
-        if (Global.SymbolName.empty())
-          Global.SymbolName = Info.Name;
-      } else {
+        auto Index = readVaruint32(Ctx);
+        if (Index >= DataSegments.size())
+          return make_error<GenericBinaryError>("invalid data symbol index",
+                                                object_error::parse_failed);
+        auto Offset = readVaruint64(Ctx);
+        auto Size = readVaruint64(Ctx);
+        size_t SegmentSize = DataSegments[Index].Data.Content.size();
+        if (Offset > SegmentSize)
+          return make_error<GenericBinaryError>(
+              "invalid data symbol offset: `" + Info.Name + "` (offset: " +
+                  Twine(Offset) + " segment size: " + Twine(SegmentSize) + ")",
+              object_error::parse_failed);
+        Info.DataRef = wasm::WasmDataReference{Index, Offset, Size};
+      } else { // undefined global like __stack_pointer is mapped to Global Index
+        Info.ElementIndex = readVaruint32(Ctx);
+        if (!isValidGlobalIndex(Info.ElementIndex))
+          return make_error<GenericBinaryError>("invalid global symbol index",
+                                              object_error::parse_failed);
         wasm::WasmImport &Import = *ImportedGlobals[Info.ElementIndex];
         if ((Info.Flags & wasm::WASM_SYMBOL_EXPLICIT_NAME) != 0) {
           Info.Name = readString(Ctx);
@@ -661,6 +664,35 @@ Error WasmObjectFile::parseLinkingSectionSymtab(ReadContext &Ctx) {
           Info.ImportModule = Import.Module;
         }
       }
+//      Info.ElementIndex = readVaruint32(Ctx);
+//      if (!isValidGlobalIndex(Info.ElementIndex) ||
+//          IsDefined != isDefinedGlobalIndex(Info.ElementIndex))
+//        return make_error<GenericBinaryError>("invalid global symbol index",
+//                                              object_error::parse_failed);
+//      if (!IsDefined && (Info.Flags & wasm::WASM_SYMBOL_BINDING_MASK) ==
+//                            wasm::WASM_SYMBOL_BINDING_WEAK)
+//        return make_error<GenericBinaryError>("undefined weak global symbol",
+//                                              object_error::parse_failed);
+//      if (IsDefined) {
+//        Info.Name = readString(Ctx);
+//        unsigned GlobalIndex = Info.ElementIndex - NumImportedGlobals;
+//        wasm::WasmGlobal &Global = Globals[GlobalIndex];
+//        GlobalType = &Global.Type;
+//        if (Global.SymbolName.empty())
+//          Global.SymbolName = Info.Name;
+//      } else {
+//        wasm::WasmImport &Import = *ImportedGlobals[Info.ElementIndex];
+//        if ((Info.Flags & wasm::WASM_SYMBOL_EXPLICIT_NAME) != 0) {
+//          Info.Name = readString(Ctx);
+//          Info.ImportName = Import.Field;
+//        } else {
+//          Info.Name = Import.Field;
+//        }
+//        GlobalType = &Import.Global;
+//        if (!Import.Module.empty()) {
+//          Info.ImportModule = Import.Module;
+//        }
+//      }
       break;
 
     case wasm::WASM_SYMBOL_TYPE_TABLE:
@@ -951,14 +983,18 @@ Error WasmObjectFile::parseRelocSection(StringRef Name, ReadContext &Ctx) {
                                               object_error::parse_failed);
       break;
     case wasm::R_WASM_GLOBAL_INDEX_LEB:
-      // R_WASM_GLOBAL_INDEX_LEB are can be used against function and data
-      // symbols to refer to their GOT entries.
-      if (!isValidGlobalSymbol(Reloc.Index) &&
-          !isValidDataSymbol(Reloc.Index) &&
-          !isValidFunctionSymbol(Reloc.Index))
-        return make_error<GenericBinaryError>("invalid relocation global index",
+      if (!isValidGlobalSymbol(Reloc.Index))
+        return make_error<GenericBinaryError>("invalid relocation data index",
                                               object_error::parse_failed);
       break;
+      // R_WASM_GLOBAL_INDEX_LEB are can be used against function and data
+      // symbols to refer to their GOT entries.
+//      if (!isValidGlobalSymbol(Reloc.Index) &&
+//          !isValidDataSymbol(Reloc.Index) &&
+//          !isValidFunctionSymbol(Reloc.Index))
+//        return make_error<GenericBinaryError>("invalid relocation global index",
+//                                              object_error::parse_failed);
+//      break;
     case wasm::R_WASM_GLOBAL_INDEX_I32:
       if (!isValidGlobalSymbol(Reloc.Index))
         return make_error<GenericBinaryError>("invalid relocation global index",

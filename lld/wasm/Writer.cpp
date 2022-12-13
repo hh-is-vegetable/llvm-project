@@ -69,6 +69,7 @@ private:
   void createCommandExportWrapper(uint32_t functionIndex, DefinedFunction *f);
 
   void assignIndexes();
+  void finalizeGlobalAddress();
   void populateSymtab();
   void populateProducers();
   void populateTargetFeatures();
@@ -556,7 +557,8 @@ void Writer::checkImportExportTargetFeatures() {
   if (out.targetFeaturesSec->features.count("mutable-globals") == 0) {
     for (const Symbol *sym : out.importSec->importedSymbols) {
       if (auto *global = dyn_cast<GlobalSymbol>(sym)) {
-        if (global->getGlobalType()->Mutable) {
+        if (global->getGlobalType()->Mutable
+            && global->getGlobalType()->Type ) {
           error(Twine("mutable global imported but 'mutable-globals' feature "
                       "not present in inputs: `") +
                 toString(*sym) + "`. Use --no-check-features to suppress.");
@@ -564,10 +566,13 @@ void Writer::checkImportExportTargetFeatures() {
       }
     }
     for (const Symbol *sym : out.exportSec->exportedSymbols) {
-      if (isa<GlobalSymbol>(sym)) {
-        error(Twine("mutable global exported but 'mutable-globals' feature "
-                    "not present in inputs: `") +
-              toString(*sym) + "`. Use --no-check-features to suppress.");
+      if (auto *global = dyn_cast<GlobalSymbol>(sym)) {
+        if (global->getGlobalType()->Mutable
+            && global->getGlobalType()->Type == WASM_TYPE_MEMREF) {
+          error(Twine("mutable global exported but 'mutable-globals' feature "
+                      "not present in inputs: `") +
+                toString(*sym) + "`. Use --no-check-features to suppress.");
+        }
       }
     }
   }
@@ -844,6 +849,26 @@ void Writer::assignIndexes() {
 
   out.globalSec->assignIndexes();
   out.tableSec->assignIndexes();
+}
+
+void Writer::finalizeGlobalAddress() {
+  for (ObjFile *file : symtab->objectFiles) {
+    for(auto *sym : file->getSymbols()) {
+      if(auto *definedG = dyn_cast<DefinedGlobal>(sym)) {
+        // global variable like __stack_pointer no need to init again
+        if(definedG->segment) {
+          definedG->global->setMemrefVlaue(
+              definedG->getVA(),     // addr
+              definedG->getSize(),   // size
+              0,                     // TODO:attr means read only or others
+              0                      // TODO:info means temporal metadata or other info
+          );
+          LLVM_DEBUG(dbgs() << sym->getName() << "global val:" <<
+                     definedG->getVA() << "\n");
+        }
+      }
+    }
+  }
 }
 
 static StringRef getOutputDataSegmentName(const InputChunk &seg) {
@@ -1580,6 +1605,8 @@ void Writer::run() {
   createSyntheticInitFunctions();
   log("-- assignIndexes");
   assignIndexes();
+  log("-- finalizeGlobalAddress");
+  finalizeGlobalAddress();
   log("-- calculateInitFunctions");
   calculateInitFunctions();
 

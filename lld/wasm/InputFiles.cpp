@@ -591,11 +591,21 @@ Symbol *ObjFile::createDefined(const WasmSymbol &sym) {
     return symtab->addDefinedData(name, flags, this, seg, offset, size);
   }
   case WASM_SYMBOL_TYPE_GLOBAL: {
-    InputGlobal *global =
-        globals[sym.Info.ElementIndex - wasmObj->getNumImportedGlobals()];
+    InputChunk *seg = segments[sym.Info.DataRef.Segment];
+    uint64_t offset = sym.Info.DataRef.Offset;
+    uint64_t size = sym.Info.DataRef.Size;
+    // create InputGlobal*
+    llvm::wasm::WasmGlobal wasmGlobal;
+    bool is64 = config->is64.getValueOr(false);
+    wasmGlobal.Type = {uint8_t(is64 ? WASM_TYPE_I64 : WASM_TYPE_MEMREF), false};
+    wasmGlobal.InitExpr = is64 ? intConst(0, is64) : memrefAlloc(0, 0, 0, 0, is64);
+    wasmGlobal.SymbolName = name;
+    InputGlobal *global = make<InputGlobal>(wasmGlobal, nullptr);
+    globals.push_back(global);
+    // create DefinedGlobal
     if (sym.isBindingLocal())
-      return make<DefinedGlobal>(name, flags, this, global);
-    return symtab->addDefinedGlobal(name, flags, this, global);
+      return make<DefinedGlobal>(name, flags, this, seg, offset, size, global);
+    return symtab->addDefinedGlobal(name, flags, this, seg, offset, size, global);
   }
   case WASM_SYMBOL_TYPE_SECTION: {
     InputChunk *section = customSectionsByIndex[sym.Info.ElementIndex];

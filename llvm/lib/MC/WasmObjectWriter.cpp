@@ -674,7 +674,6 @@ WasmObjectWriter::getProvisionalValue(const WasmRelocationEntry &RelEntry,
     // Provisional value is same as the index
     return getRelocationIndexValue(RelEntry);
   case wasm::R_WASM_FUNCTION_INDEX_LEB:
-  case wasm::R_WASM_GLOBAL_INDEX_LEB:
   case wasm::R_WASM_GLOBAL_INDEX_I32:
   case wasm::R_WASM_TAG_INDEX_LEB:
   case wasm::R_WASM_TABLE_NUMBER_LEB:
@@ -690,6 +689,7 @@ WasmObjectWriter::getProvisionalValue(const WasmRelocationEntry &RelEntry,
         static_cast<const MCSectionWasm &>(RelEntry.Symbol->getSection());
     return Section.getSectionOffset() + RelEntry.Addend;
   }
+  case wasm::R_WASM_GLOBAL_INDEX_LEB:
   case wasm::R_WASM_MEMORY_ADDR_LEB:
   case wasm::R_WASM_MEMORY_ADDR_LEB64:
   case wasm::R_WASM_MEMORY_ADDR_SLEB:
@@ -953,7 +953,7 @@ void WasmObjectWriter::writeGlobalSection(ArrayRef<wasm::WasmGlobal> Globals) {
       break;
     case wasm::WASM_TYPE_MEMREF:
       encodeSLEB128(0, W->OS); // addr
-      encodeSLEB128(Global.InitExpr.Value.Memref.size, W->OS); // size
+      encodeSLEB128(0, W->OS); // size
       encodeSLEB128(0, W->OS); // attr
       encodeSLEB128(0, W->OS); // info
       break ;
@@ -1176,7 +1176,6 @@ void WasmObjectWriter::writeLinkingMetaDataSection(
       encodeULEB128(Sym.Flags, W->OS);
       switch (Sym.Kind) {
       case wasm::WASM_SYMBOL_TYPE_FUNCTION:
-      case wasm::WASM_SYMBOL_TYPE_GLOBAL:
       case wasm::WASM_SYMBOL_TYPE_TAG:
       case wasm::WASM_SYMBOL_TYPE_TABLE:
         encodeULEB128(Sym.ElementIndex, W->OS);
@@ -1184,6 +1183,24 @@ void WasmObjectWriter::writeLinkingMetaDataSection(
             (Sym.Flags & wasm::WASM_SYMBOL_EXPLICIT_NAME) != 0)
           writeString(Sym.Name);
         break;
+
+      case wasm::WASM_SYMBOL_TYPE_GLOBAL:{
+        // if defined
+        if((Sym.Flags & wasm::WASM_SYMBOL_UNDEFINED) == 0) {
+          writeString(Sym.Name);
+          encodeULEB128(Sym.DataRef.Segment, W->OS);
+          encodeULEB128(Sym.DataRef.Offset, W->OS);
+          encodeULEB128(Sym.DataRef.Size, W->OS);
+        } else {
+          // else undefined
+          encodeULEB128(Sym.ElementIndex, W->OS);
+          if((Sym.Flags & wasm::WASM_SYMBOL_EXPLICIT_NAME) != 0) {
+            writeString(Sym.Name);
+          }
+        }
+        break ;
+      }
+
       case wasm::WASM_SYMBOL_TYPE_DATA:
         writeString(Sym.Name);
         if ((Sym.Flags & wasm::WASM_SYMBOL_UNDEFINED) == 0) {
@@ -1664,36 +1681,53 @@ uint64_t WasmObjectWriter::writeOneObject(MCAssembler &Asm,
       } else if (WS.isGlobal()) {
         // A "true" Wasm global (currently just __stack_pointer)
         if (WS.isDefined()) {
-          wasm::WasmGlobal Global;
-          Global.Type = WS.getGlobalType();
-          Global.Index = NumGlobalImports + Globals.size();
-          switch (Global.Type.Type) {
-          case wasm::WASM_TYPE_I32:
-            Global.InitExpr.Opcode = wasm::WASM_OPCODE_I32_CONST;
-            break;
-          case wasm::WASM_TYPE_I64:
-            Global.InitExpr.Opcode = wasm::WASM_OPCODE_I64_CONST;
-            break;
-          case wasm::WASM_TYPE_F32:
-            Global.InitExpr.Opcode = wasm::WASM_OPCODE_F32_CONST;
-            break;
-          case wasm::WASM_TYPE_F64:
-            Global.InitExpr.Opcode = wasm::WASM_OPCODE_F64_CONST;
-            break;
-          case wasm::WASM_TYPE_EXTERNREF:
-            Global.InitExpr.Opcode = wasm::WASM_OPCODE_REF_NULL;
-            break;
-          case wasm::WASM_TYPE_MEMREF:
-            Global.InitExpr.Opcode = wasm::WASM_OPCODE_MEMREF_ALLOC;
-            Global.InitExpr.Value.Memref.size = cast<MCConstantExpr>(WS.getSize())->getValue();
-            Global.SymbolName = WS.getName();
-            break;
-          default:
-            llvm_unreachable("unexpected type");
-          }
-          assert(WasmIndices.count(&WS) == 0);
-          WasmIndices[&WS] = Global.Index;
-          Globals.push_back(Global);
+          int64_t Size = 0;
+          if (!WS.getSize()->evaluateAsAbsolute(Size, Layout))
+            report_fatal_error(".size expression must be evaluatable");
+
+          auto &DataSection = static_cast<MCSectionWasm &>(WS.getSection());
+          if (!DataSection.isWasmData())
+            report_fatal_error("Global symbols must map to a data section: " +
+                               WS.getName());
+
+          // For each global symbol, export it in the symtab as a reference to the
+          // corresponding Wasm data segment.
+          wasm::WasmDataReference Ref = wasm::WasmDataReference{
+              DataSection.getSegmentIndex(), Layout.getSymbolOffset(WS),
+              static_cast<uint64_t>(Size)};
+          assert(DataLocations.count(&WS) == 0);
+          DataLocations[&WS] = Ref;
+          LLVM_DEBUG(dbgs() << "Global Symbol " << WS.getName() << "  -> segment index: " << Ref.Segment << "\n");
+//          wasm::WasmGlobal Global;
+//          Global.Type = WS.getGlobalType();
+//          Global.Index = NumGlobalImports + Globals.size();
+//          switch (Global.Type.Type) {
+//          case wasm::WASM_TYPE_I32:
+//            Global.InitExpr.Opcode = wasm::WASM_OPCODE_I32_CONST;
+//            break;
+//          case wasm::WASM_TYPE_I64:
+//            Global.InitExpr.Opcode = wasm::WASM_OPCODE_I64_CONST;
+//            break;
+//          case wasm::WASM_TYPE_F32:
+//            Global.InitExpr.Opcode = wasm::WASM_OPCODE_F32_CONST;
+//            break;
+//          case wasm::WASM_TYPE_F64:
+//            Global.InitExpr.Opcode = wasm::WASM_OPCODE_F64_CONST;
+//            break;
+//          case wasm::WASM_TYPE_EXTERNREF:
+//            Global.InitExpr.Opcode = wasm::WASM_OPCODE_REF_NULL;
+//            break;
+//          case wasm::WASM_TYPE_MEMREF:
+//            Global.InitExpr.Opcode = wasm::WASM_OPCODE_MEMREF_ALLOC;
+//            Global.InitExpr.Value.Memref.size = cast<MCConstantExpr>(WS.getSize())->getValue();
+//            Global.SymbolName = WS.getName();
+//            break;
+//          default:
+//            llvm_unreachable("unexpected type");
+//          }
+//          assert(WasmIndices.count(&WS) == 0);
+//          WasmIndices[&WS] = Global.Index;
+//          Globals.push_back(Global);
         } else {
           // An import; the index was assigned above
           LLVM_DEBUG(dbgs() << "  -> global index: "
@@ -1820,7 +1854,7 @@ uint64_t WasmObjectWriter::writeOneObject(MCAssembler &Asm,
     Info.Name = WS.getName();
     Info.Kind = WS.getType().getValueOr(wasm::WASM_SYMBOL_TYPE_DATA);
     Info.Flags = Flags;
-    if (!WS.isData()) {
+    if ((!WS.isData() && !WS.isGlobal()) || (WS.isGlobal() && WS.isUndefined())) {
       assert(WasmIndices.count(&WS) > 0);
       Info.ElementIndex = WasmIndices.find(&WS)->second;
     } else if (WS.isDefined()) {

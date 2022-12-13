@@ -76,38 +76,37 @@ bool WebAssemblyDealGlobalAddress::runOnMachineFunction(MachineFunction &MF) {
     LLVM_DEBUG(dbgs() << "WebAssemblyDealGlobalAddress\n");
 
     unsigned NumOperands = MI.getNumOperands();
-    for(unsigned idx = 0; idx < NumOperands; idx++) {
-      MachineOperand& MO = MI.getOperand(idx);
-      LLVM_DEBUG(dbgs() << "MI: "; MI.dump();
-                 dbgs() << "MO: "; MO.dump());
+    for(unsigned Idx = 0; Idx < NumOperands; Idx++) {
+      MachineOperand& MO = MI.getOperand(Idx);
       // try to find the MI, whose Machine Operand is global value
       if(MO.isGlobal()) {
-        auto GV = MO.getGlobal();
+        const auto *GV = MO.getGlobal();
         LLVM_DEBUG(dbgs() << "Global Machine Operand:"; GV->dump());
         StringRef GVName = GV->getName();
         // Global may be "@val + 4", 4 is the offset
         int64_t GVOffset = MO.getOffset();
         MO.setOffset(0);
 
-        // create symbol
-        MCSymbolWasm* sym = cast<MCSymbolWasm>(MF.getContext().getOrCreateSymbol(GVName));
-        sym->setType(wasm::WASM_SYMBOL_TYPE_GLOBAL);
+        // create symbol: .global.Name
+//        auto *Sym = MF.getContext().getOrCreateSymbol(GVName);
+        MCSymbolWasm* Sym = cast<MCSymbolWasm>(MF.getContext().getOrCreateSymbol(GVName));
+        Sym->setType(wasm::WASM_SYMBOL_TYPE_GLOBAL);
 
-        // global size and type
-        uint64_t TySize =
-            MF.getDataLayout().getTypeAllocSize(GV->getValueType()).getKnownMinSize();
-        auto sizeExpr = MCConstantExpr::create(TySize, MF.getContext());
-        sym->setSize(sizeExpr);
-//        sym->setGlobalSize(TySize);
+//        // global size and type
+//        uint64_t TySize =
+//            MF.getDataLayout().getTypeAllocSize(GV->getValueType()).getKnownMinSize();
+//        const auto *SizeExpr = MCConstantExpr::create(TySize, MF.getContext());
+//        Sym->setSize(SizeExpr);
+////        sym->setGlobalSize(TySize);
         wasm::WasmGlobalType GlobalType = {wasm::WASM_TYPE_MEMREF, false};
-        sym->setGlobalType(GlobalType);
+        Sym->setGlobalType(GlobalType);
 
-        LLVM_DEBUG(dbgs() << "create or get wasm global sym:"; sym->dump());
-        Register dest = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
+        LLVM_DEBUG(dbgs() << "create or get wasm global sym:"; Sym->dump());
+        Register Dest = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
 
         // build new MI
-        BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::GLOBAL_GET_MEMREF), dest)
-            .addSym(sym);
+        BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::GLOBAL_GET_MEMREF), Dest)
+            .addSym(Sym);
 
         // deal Offset
         if(GVOffset) {
@@ -122,14 +121,14 @@ bool WebAssemblyDealGlobalAddress::runOnMachineFunction(MachineFunction &MF) {
           // memref.add
           Register newReg = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
           BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_ADD), newReg)
-            .addReg(dest)
+            .addReg(Dest)
             .addReg(i32Reg);
 
-          dest = newReg;
+          Dest = newReg;
         }
 
         // change to Reg
-        MO.ChangeToRegister(dest, false);
+        MO.ChangeToRegister(Dest, false);
 
         Changed = true;
       }
