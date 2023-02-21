@@ -453,7 +453,7 @@ void GlobalSection::writeBody() {
     writeInitExpr(os, g->getInitExpr());
   }
   bool is64 = config->is64.getValueOr(false);
-  uint8_t itype = is64 ? WASM_TYPE_I64 : WASM_TYPE_I32;
+  uint8_t itype = is64 ? WASM_TYPE_I64 : WASM_TYPE_MEMREF;
   for (const Symbol *sym : internalGotSymbols) {
     bool mutable_ = false;
     if (!sym->isStub) {
@@ -483,7 +483,7 @@ void GlobalSection::writeBody() {
   for (const DefinedData *sym : dataAddressGlobals) {
     WasmGlobalType type{itype, false};
     writeGlobalType(os, type);
-    writeInitExpr(os, memrefAlloc(sym->getVA(), sym->getSize(), 0, 0, is64));
+    writeInitExpr(os, memrefAlloc(sym->getVA(), sym->getSize(), 0, is64));
   }
 }
 

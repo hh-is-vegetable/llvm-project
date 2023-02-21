@@ -28,9 +28,9 @@ def SDTMrefBinary : SDTypeProfile<1, 2, [
   SDTCisVT<0, memref>, SDTCisVT<1, memref>, SDTCisInt<2>
 ]>;
 
-def SDTMrefAlloc : SDTypeProfile<1, 4, [
+def SDTMrefAlloc : SDTypeProfile<1, 3, [
   SDTCisVT<0, memref>, 
-  SDTCisInt<1>, SDTCisInt<2>, SDTCisInt<3>, SDTCisInt<4>
+  SDTCisInt<1>, SDTCisInt<2>, SDTCisInt<3>
 ]>;
 
 // mrefadd
@@ -339,28 +339,28 @@ defm : StorePatGlobalAddr<i64, truncstorei8, "MSSTORE8_I64">;
 defm : StorePatGlobalAddr<i64, truncstorei16, "MSSTORE16_I64">;
 defm : StorePatGlobalAddr<i64, truncstorei32, "MSSTORE32_I64">;
 
-defm MEMREF_NULL : I<(outs MEMREF:$dst), (ins),
-                        (outs), (ins),
-                        [(set MEMREF:$dst, (!cast<Intrinsic>("int_wasm_memref_null")))],
-                        "memref.null\t$dst",
-                        "memref.null\t", 0xea>,
-                      Requires<[HasAddr32]>;
+// defm MEMREF_NULL : I<(outs MEMREF:$dst), (ins),
+//                         (outs), (ins),
+//                         [(set MEMREF:$dst, (!cast<Intrinsic>("int_wasm_memref_null")))],
+//                         "memref.null\t$dst",
+//                         "memref.null\t", 0xfa>,
+//                       Requires<[HasAddr32]>;
 
 defm MEMREF_ADD : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$val), (outs), (ins),
                 [(set MEMREF:$res, (mrefadd MEMREF:$mref, I32:$val))],
                 "memref.add\t$res, $mref, $val",
-                "memref.add\t", 0xeb>;
+                "memref.add\t", 0xdb>;
 
 defm MEMREF_AND : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$val), (outs), (ins),
                 [(set MEMREF:$res, (mrefand MEMREF:$mref, I32:$val))],
                 "memref.and\t$res, $mref, $val",
-                "memref.and\t", 0xec>;
+                "memref.and\t", 0xdc>;
 
-defm MEMREF_ALLOC : I<(outs MEMREF:$res), (ins I32:$addr, I32:$size, I32:$attr, I32:$info),
+defm MEMREF_ALLOC : I<(outs MEMREF:$res), (ins I32:$addr, I32:$size, I32:$attr),
                   (outs), (ins),
-                  [(set MEMREF:$res, (mrefalloc I32:$addr, I32:$size, I32:$attr, I32:$info))],
-                  "memref.alloc\t$res, $addr, $size, $attr, $info",
-                  "memref.alloc\t", 0xed>;
+                  [(set MEMREF:$res, (mrefalloc I32:$addr, I32:$size, I32:$attr))],
+                  "memref.alloc\t$res, $addr, $size, $attr",
+                  "memref.alloc\t", 0xdd>;
 
 def : Pat<(memref (mrefand (WebAssemblyWrapper tglobaladdr:$mref), I32:$val)),
           (MEMREF_AND tglobaladdr:$mref, I32:$val)>,

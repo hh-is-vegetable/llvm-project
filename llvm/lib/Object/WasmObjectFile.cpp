@@ -192,11 +192,11 @@ static Error readInitExpr(wasm::WasmInitExpr &Expr,
     }
     break;
   }
-  case wasm::WASM_OPCODE_MEMREF_ALLOC: {
+  case wasm::WASM_OPCODE_MEMREF_CONST: {
     Expr.Value.Memref.addr = readVarint32(Ctx);
     Expr.Value.Memref.size = readVarint32(Ctx);
     Expr.Value.Memref.attr = readVarint32(Ctx);
-    Expr.Value.Memref.info = readVarint32(Ctx);
+    // Expr.Value.Memref.info = readVarint32(Ctx);
     break;
   }
   default:

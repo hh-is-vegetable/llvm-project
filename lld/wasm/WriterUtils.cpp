@@ -182,11 +182,11 @@ void writeInitExpr(raw_ostream &os, const WasmInitExpr &initExpr) {
     writeValueType(os, ValType::EXTERNREF, "literal (externref type)");
     break;
     // Fixme: here ($addr,$size,$attr,$info) is immediate, may be it should be fixed
-  case WASM_OPCODE_MEMREF_ALLOC:
+  case WASM_OPCODE_MEMREF_CONST:
     writeSleb128(os, initExpr.Value.Memref.addr, "literal (memref addr)");
     writeSleb128(os, initExpr.Value.Memref.size, "literal (memref size)");
     writeSleb128(os, initExpr.Value.Memref.attr, "literal (memref attr)");
-    writeSleb128(os, initExpr.Value.Memref.info, "literal (memref info)");
+    // writeSleb128(os, initExpr.Value.Memref.info, "literal (memref info)");
     break;
   default:
     fatal("unknown opcode in init expr: " + Twine(initExpr.Opcode));

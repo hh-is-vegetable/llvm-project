@@ -103,7 +103,7 @@ struct WasmInitExpr {
       int64_t addr;
       int64_t size;
       int64_t attr;
-      int64_t info;
+      // int64_t info;
     }Memref;
   } Value;
 };
@@ -294,8 +294,8 @@ enum : unsigned {
   WASM_OPCODE_I32_ADD = 0x6a,
   WASM_OPCODE_I64_ADD = 0x7c,
   WASM_OPCODE_REF_NULL = 0xd0,
-  WASM_OPCODE_MEMREF_NULL = 0xea,
-  WASM_OPCODE_MEMREF_ALLOC = 0xed,
+  WASM_OPCODE_MEMREF_CONST = 0xda,
+  WASM_OPCODE_MEMREF_ALLOC = 0xdd,
 };
 
 // Opcodes used in synthetic functions.

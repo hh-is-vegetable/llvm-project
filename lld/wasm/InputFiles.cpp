@@ -598,7 +598,7 @@ Symbol *ObjFile::createDefined(const WasmSymbol &sym) {
     llvm::wasm::WasmGlobal wasmGlobal;
     bool is64 = config->is64.getValueOr(false);
     wasmGlobal.Type = {uint8_t(is64 ? WASM_TYPE_I64 : WASM_TYPE_MEMREF), false};
-    wasmGlobal.InitExpr = is64 ? intConst(0, is64) : memrefAlloc(0, 0, 0, 0, is64);
+    wasmGlobal.InitExpr = is64 ? intConst(0, is64) : memrefAlloc(0, 0, 0,is64);
     wasmGlobal.SymbolName = name;
     InputGlobal *global = make<InputGlobal>(wasmGlobal, nullptr);
     globals.push_back(global);

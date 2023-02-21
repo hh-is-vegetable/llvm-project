@@ -1718,7 +1718,7 @@ uint64_t WasmObjectWriter::writeOneObject(MCAssembler &Asm,
 //            Global.InitExpr.Opcode = wasm::WASM_OPCODE_REF_NULL;
 //            break;
 //          case wasm::WASM_TYPE_MEMREF:
-//            Global.InitExpr.Opcode = wasm::WASM_OPCODE_MEMREF_ALLOC;
+//            Global.InitExpr.Opcode = wasm::WASM_OPCODE_MEMREF_CONST;
 //            Global.InitExpr.Value.Memref.size = cast<MCConstantExpr>(WS.getSize())->getValue();
 //            Global.SymbolName = WS.getName();
 //            break;
