@@ -251,7 +251,7 @@ void Writer::layoutMemory() {
     log("mem: stack size  = " + Twine(config->zStackSize));
     log("mem: stack base  = " + Twine(memoryPtr));
     memoryPtr += config->zStackSize;
-    setGlobalMemref(cast<DefinedGlobal>(WasmSym::stackPointer), memoryPtr, config->zStackSize); // lower bound is memoryPtr-size
+    setGlobalMemref(cast<DefinedGlobal>(WasmSym::stackPointer), memoryPtr); // lower bound is memoryPtr-size
     log("mem: stack top   = " + Twine(memoryPtr));
   };
 

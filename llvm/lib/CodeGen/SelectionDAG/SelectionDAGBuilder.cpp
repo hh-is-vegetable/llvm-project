@@ -3906,6 +3906,9 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
   }
 
   auto hasWasmMemref = TM.hasWasmMemref() && N.getValueType().isMemref();
+  bool isNarrow = false;
+  SDValue NarrowBase;
+  SDValue NarrowSize;
   for (gep_type_iterator GTI = gep_type_begin(&I), E = gep_type_end(&I);
        GTI != E; ++GTI) { // This loop is to get the real address = N + Offset
     const Value *Idx = GTI.getOperand();
@@ -3928,6 +3931,20 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
         else
           N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
                         DAG.getConstant(Offset, dl, N.getValueType()), Flags);
+      }
+      if(hasWasmMemref) {
+        isNarrow = true;
+        EVT PtrIntegerTy = TLI.getPointerTy(DAG.getDataLayout()).changeTypeToInteger();
+        // memref.field 0 is addr
+        NarrowBase = DAG.getNode(ISD::WASM_MEMREF_FIELD, dl, PtrIntegerTy, DAG.getConstant(0, dl, PtrIntegerTy), N);
+        Type* FieldTy = StTy->getElementType(Field);
+        TypeSize FieldSize = DAG.getDataLayout().getTypeStoreSize(FieldTy);
+        if(FieldSize.isScalable()) {
+          NarrowSize = DAG.getVScale(dl, PtrIntegerTy, APInt(PtrIntegerTy.getScalarSizeInBits(),
+                               FieldSize.getKnownMinValue()));
+        } else {
+          NarrowSize = DAG.getConstant(FieldSize.getFixedValue(), dl, PtrIntegerTy);
+        }
       }
     } else {
       // IdxSize is the width of the arithmetic according to IR semantics.
@@ -4027,6 +4044,9 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
     }
   }
 
+  if(isNarrow) {
+    N = DAG.getNode(ISD::WASM_MEMREF_NARROW, dl, N.getValueType(), N, NarrowBase, NarrowSize);
+  }
   MVT PtrTy = TLI.getPointerTy(DAG.getDataLayout(), AS);
   MVT PtrMemTy = TLI.getPointerMemTy(DAG.getDataLayout(), AS);
   if (IsVectorGEP) {
@@ -4069,7 +4089,7 @@ void SelectionDAGBuilder::visitAlloca(const AllocaInst &I) {
   LLVM_DEBUG(dbgs() << "\nAllocSize:\n";AllocSize.dump(););
 
   EVT IntPtr = TLI.getPointerTy(DAG.getDataLayout(), DL.getAllocaAddrSpace());
-  EVT PtrBack = IntPtr;
+  EVT PtrRaw = IntPtr;
   if (IntPtr.isMemref())IntPtr = IntPtr.changeTypeToInteger();
   LLVM_DEBUG(dbgs()<<"\nIntPtr:"<<IntPtr.getEVTString()<<"\n");
   if (AllocSize.getValueType() != IntPtr)
@@ -4109,7 +4129,8 @@ void SelectionDAGBuilder::visitAlloca(const AllocaInst &I) {
       getRoot(), AllocSize,
       DAG.getConstant(Alignment ? Alignment->value() : 0, dl, IntPtr)};
 //  SDVTList VTs = DAG.getVTList(AllocSize.getValueType(), MVT::Other);
-  SDVTList VTs = DAG.getVTList(PtrBack.isMemref() ? PtrBack :
+  SDVTList VTs = DAG.getVTList(
+      PtrRaw.isMemref() ? PtrRaw :
                                    AllocSize.getValueType(), MVT::Other);
   // operand 0 is chain, operand 1 is AllocSize, 2 is Alignment
   SDValue DSA = DAG.getNode(ISD::DYNAMIC_STACKALLOC, dl, VTs, Ops);

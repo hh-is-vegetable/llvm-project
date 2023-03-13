@@ -33,6 +33,16 @@ def SDTMrefAlloc : SDTypeProfile<1, 3, [
   SDTCisInt<1>, SDTCisInt<2>, SDTCisInt<3>
 ]>;
 
+def SDTMrefNarrow : SDTypeProfile<1, 3, [
+  SDTCisVT<0, memref>,
+  SDTCisVT<1, memref>, SDTCisInt<2>, SDTCisInt<3>
+]>;
+
+def SDTMrefField : SDTypeProfile<1, 2, [
+  SDTCisInt<0>,
+  SDTCisInt<1>, SDTCisVT<2, memref>
+]>;
+
 // mrefadd
 def mrefadd : SDNode<"ISD::WASM_MEMREF_ADD", SDTMrefBinary, []>;
 
@@ -41,13 +51,18 @@ def mrefand : SDNode<"ISD::WASM_MEMREF_AND", SDTMrefBinary, []>;
 
 def mrefalloc : SDNode<"ISD::WASM_MEMREF_ALLOC", SDTMrefAlloc, []>;
 
+def mrefnarrow : SDNode<"ISD::WASM_MEMREF_NARROW", SDTMrefNarrow, []>;
+
+def mreffield : SDNode<"ISD::WASM_MEMREF_FIELD", SDTMrefField, []>;
+
 // this is for memref plus i32
 def regMemrefPlusImm : PatFrag<(ops node:$mref, node:$off),
                                (mrefadd node:$mref, node:$off)>;
 
 // i32 immediate
 def SDTInt32Leaf : SDTypeProfile<1, 0, [SDTCisVT<0, i32>]>;
-def imm_i32      : SDNode<"ISD::TargetConstant"  , SDTInt32Leaf , [], "ConstantSDNode">;
+def imm_i32_target   : SDNode<"ISD::TargetConstant"  , SDTInt32Leaf , [], "ConstantSDNode">;
+def imm_i32          : SDNode<"ISD::Constant"  , SDTInt32Leaf , [], "ConstantSDNode">;
 // i64 immediate
 def SDTInt64Leaf : SDTypeProfile<1, 0, [SDTCisVT<0, i64>]>;
 def imm_i64      : SDNode<"ISD::TargetConstant"  , SDTInt64Leaf , [], "ConstantSDNode">;
@@ -100,7 +115,7 @@ defm : MSLoadPatNoOffset<memref, load, "MSLOAD_MEMREF">;
 // Pattern with address + immediate offset
 multiclass MSLoadPatImmOff<ValueType ty, SDPatternOperator kind, PatFrag operand,
                          string inst> {
-  def : Pat<(ty (kind (operand MEMREF:$mref, imm_i32:$off))),
+  def : Pat<(ty (kind (operand MEMREF:$mref, imm_i32_target:$off))),
             (!cast<NI>(inst # "_A32") 0, imm:$off, MEMREF:$mref)>,
         Requires<[HasAddr32]>;
   def : Pat<(ty (kind (operand MEMREF:$mref, imm_i64:$off))),
@@ -260,7 +275,7 @@ defm : MSStorePatNoOffset<memref, store, "MSSTORE_MEMREF">;
 // Select stores with a constant offset.
 multiclass MSStorePatImmOff<ValueType ty, PatFrag kind, PatFrag operand,
                           string inst> {
-  def : Pat<(kind ty:$val, (operand MEMREF:$mref, imm_i32:$off)),
+  def : Pat<(kind ty:$val, (operand MEMREF:$mref, imm_i32_target:$off)),
             (!cast<NI>(inst # "_A32") 0, imm:$off, MEMREF:$mref, ty:$val)>,
         Requires<[HasAddr32]>;
   def : Pat<(kind ty:$val, (operand MEMREF:$mref, imm_i64:$off)),
@@ -362,6 +377,29 @@ defm MEMREF_ALLOC : I<(outs MEMREF:$res), (ins I32:$addr, I32:$size, I32:$attr),
                   "memref.alloc\t$res, $addr, $size, $attr",
                   "memref.alloc\t", 0xdd>;
 
+defm MEMREF_NARROW : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$base, I32:$size), 
+                (outs), (ins),
+                [(set MEMREF:$res, (mrefnarrow MEMREF:$mref, I32:$base, I32:$size))],
+                "memref.narrow\t$res, $mref, $base, $size",
+                "memref.narrow\t", 0xde>;
+
+def : Pat<(memref (mrefnarrow (WebAssemblyWrapper tglobaladdr:$mref), I32:$base, I32:$size)),
+          (MEMREF_NARROW tglobaladdr:$mref, I32:$base, I32:$size)>,
+      Requires<[IsNotPIC, HasAddr32]>;
+
+defm MEMREF_FIELD : I<(outs I32:$res), (ins i32imm_op:$idx, MEMREF:$mref),
+                (outs), (ins i32imm_op:$idx),
+                [], // [(set I32:$res, (mreffield i32imm_op:$idx, MEMREF:$mref))],
+                "memref.field\t$res, $idx, $mref",
+                "memref.field\t$idx", 0xdf>;
+
+def : Pat<(mreffield imm_i32:$idx, (WebAssemblyWrapper tglobaladdr:$mref)),
+          (MEMREF_FIELD imm:$idx, tglobaladdr:$mref)>,
+      Requires<[IsNotPIC, HasAddr32]>;
+def : Pat<(mreffield imm_i32_target:$idx, (WebAssemblyWrapper tglobaladdr:$mref)),
+          (MEMREF_FIELD imm:$idx, tglobaladdr:$mref)>,
+      Requires<[IsNotPIC, HasAddr32]>;
+
 def : Pat<(memref (mrefand (WebAssemblyWrapper tglobaladdr:$mref), I32:$val)),
           (MEMREF_AND tglobaladdr:$mref, I32:$val)>,
       Requires<[IsNotPIC, HasAddr32]>;
@@ -369,13 +407,6 @@ def : Pat<(memref (mrefand (WebAssemblyWrapper tglobaladdr:$mref), I32:$val)),
 def : Pat<(memref (mrefadd (WebAssemblyWrapper tglobaladdr:$mref), I32:$val)),
           (MEMREF_ADD tglobaladdr:$mref, I32:$val)>,
       Requires<[IsNotPIC, HasAddr32]>;
-
-
-// defm MEMREF_NARROW : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$base, I32:$size, I32:$info), 
-//                 (outs), (ins),
-//                 [(set MEMREF:$res, (node MEMREF:$mref, I32:$base, I32:$size, I32:$info))],
-//                 "memref.narrow\t$res, $mref, $base, $size, $info",
-//                 "memref.narrow\t", 0xf6>;
 
 // defm MEMREF_IS_NULL : I<(outs MEMREF:$res), (ins MEMREF:$mref), 
 //                 (outs), (ins),
