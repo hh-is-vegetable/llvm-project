@@ -389,7 +389,7 @@ def : Pat<(memref (mrefnarrow (WebAssemblyWrapper tglobaladdr:$mref), I32:$base,
 
 defm MEMREF_FIELD : I<(outs I32:$res), (ins i32imm_op:$idx, MEMREF:$mref),
                 (outs), (ins i32imm_op:$idx),
-                [], // [(set I32:$res, (mreffield i32imm_op:$idx, MEMREF:$mref))],
+                [],//[(set I32:$res, (mreffield imm_i32:$idx, MEMREF:$mref))],
                 "memref.field\t$res, $idx, $mref",
                 "memref.field\t$idx", 0xdf>;
 
@@ -398,6 +398,9 @@ def : Pat<(mreffield imm_i32:$idx, (WebAssemblyWrapper tglobaladdr:$mref)),
       Requires<[IsNotPIC, HasAddr32]>;
 def : Pat<(mreffield imm_i32_target:$idx, (WebAssemblyWrapper tglobaladdr:$mref)),
           (MEMREF_FIELD imm:$idx, tglobaladdr:$mref)>,
+      Requires<[IsNotPIC, HasAddr32]>;
+def : Pat<(mreffield imm_i32:$idx, MEMREF:$mref),
+          (MEMREF_FIELD imm:$idx, MEMREF:$mref)>,
       Requires<[IsNotPIC, HasAddr32]>;
 
 def : Pat<(memref (mrefand (WebAssemblyWrapper tglobaladdr:$mref), I32:$val)),

@@ -88,7 +88,13 @@ bool WebAssemblyDealGlobalAddress::runOnMachineFunction(MachineFunction &MF) {
 
         // create symbol: .global.Name
 //        auto *Sym = MF.getContext().getOrCreateSymbol(GVName);
-        MCSymbolWasm* Sym = cast<MCSymbolWasm>(MF.getContext().getOrCreateSymbol(GVName));
+
+//        const char *ES = "__stack_pointer";
+//        auto *SPSymbol = MF.createExternalSymbolName(ES);
+//        BuildMI(MBB, InsertPt, DL, TII->get(getOpcGlobGet(MF)), SPReg)
+//            .addExternalSymbol(SPSymbol);
+        auto * sym = MF.getContext().getOrCreateSymbol(GVName);
+        MCSymbolWasm* Sym = cast<MCSymbolWasm>(sym);
         Sym->setType(wasm::WASM_SYMBOL_TYPE_GLOBAL);
 
 //        // global size and type
@@ -114,7 +120,7 @@ bool WebAssemblyDealGlobalAddress::runOnMachineFunction(MachineFunction &MF) {
 
         // build new MI
         BuildMI(*InsertMI->getParent(), InsertMI, InsertMI->getDebugLoc(), TII->get(WebAssembly::GLOBAL_GET_MEMREF), Dest)
-            .addSym(Sym);
+            .addSym(sym);
 //        BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::GLOBAL_GET_MEMREF), Dest)
 //            .addSym(Sym);
 

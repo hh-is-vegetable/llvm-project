@@ -33,6 +33,7 @@ using namespace llvm;
 
 #define GET_REGINFO_TARGET_DESC
 #include "WebAssemblyGenRegisterInfo.inc"
+#include "llvm/Target/TargetMachine.h"
 
 WebAssemblyRegisterInfo::WebAssemblyRegisterInfo(const Triple &TT)
     : WebAssemblyGenRegisterInfo(0), TT(TT) {}
@@ -56,6 +57,7 @@ WebAssemblyRegisterInfo::getReservedRegs(const MachineFunction & /*MF*/) const {
 void WebAssemblyRegisterInfo::eliminateFrameIndex(
     MachineBasicBlock::iterator II, int SPAdj, unsigned FIOperandNum,
     RegScavenger * /*RS*/) const {
+  static std::map<int, Register> FrameIdx2Reg;
   assert(SPAdj == 0);
   MachineInstr &MI = *II;
 
@@ -70,6 +72,34 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
          "We assume that variable-sized objects have already been lowered, "
          "and don't use FrameIndex operands.");
   Register FrameRegister = getFrameRegister(MF); // TODO:here fp is just copy from sp, fix it if necessary
+  const auto *TII = MF.getSubtarget<WebAssemblySubtarget>().getInstrInfo();
+
+  if(MI.getMF()->getTarget().hasWasmMemref()) {
+    if(!FrameIdx2Reg.count(FrameIndex)) {
+      Register BaseVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
+      Register SizeVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
+      Register AttrVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
+      Register FrameObjMemRef = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
+      BuildMI(MBB, *II, II->getDebugLoc(),
+              TII->get(WebAssembly::MEMREF_FIELD), BaseVal)
+          .addImm(0) // <addr, base, size, attr>, addr->0
+          .addReg(FrameRegister);
+      BuildMI(MBB, *II, II->getDebugLoc(),
+              TII->get(WebAssembly::CONST_I32), SizeVal)
+          .addImm(MFI.getObjectSize(FrameIndex));
+      BuildMI(MBB, *II, II->getDebugLoc(),
+              TII->get(WebAssembly::CONST_I32), AttrVal)
+          .addImm(0);
+      BuildMI(MBB, *II, II->getDebugLoc(),
+              TII->get(WebAssembly::MEMREF_ALLOC), FrameObjMemRef)
+          .addReg(BaseVal)
+          .addReg(SizeVal)
+          .addReg(AttrVal);
+      FrameIdx2Reg[FrameIndex] = FrameObjMemRef;
+    }
+    MI.getOperand(FIOperandNum).ChangeToRegister(FrameIdx2Reg[FrameIndex], /*isDef=*/false);
+    return ;
+  }
 
   // If this is the address operand of a load or store, make it relative to SP
   // and fold the frame offset directly in.
@@ -120,7 +150,6 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
   }
 
   // Otherwise create an i32/64.add SP, offset and make it the operand.
-  const auto *TII = MF.getSubtarget<WebAssemblySubtarget>().getInstrInfo();
 
   unsigned FIRegOperand = FrameRegister;
   if (FrameOffset) {

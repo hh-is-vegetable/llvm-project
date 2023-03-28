@@ -1706,7 +1706,8 @@ void SelectionDAGLegalize::ExpandDYNAMIC_STACKALLOC(SDNode* Node,
   unsigned Opc =
     TFL->getStackGrowthDirection() == TargetFrameLowering::StackGrowsUp ?
     ISD::ADD : ISD::SUB;
-  if(isMemref) {
+  SDValue MemAllocSize = Size; // record alloc size
+  if(isMemref) { // WebAssembly is StackGrowsDown, so Opc should be ISD::SUB
     if(Opc == ISD::SUB)
       Size = DAG.getNode(ISD::SUB, dl, Size.getValueType(),
                        DAG.getConstant(0, dl, Size.getValueType()),
@@ -1716,6 +1717,7 @@ void SelectionDAGLegalize::ExpandDYNAMIC_STACKALLOC(SDNode* Node,
 
   Align StackAlign = TFL->getStackAlign();
   Tmp1 = DAG.getNode(Opc, dl, VT, SP, Size);       // Value
+
   if (Alignment > StackAlign)
     Tmp1 = DAG.getNode(isMemref ? ISD::WASM_MEMREF_AND : ISD::AND,
                        dl, VT, Tmp1,
@@ -1731,6 +1733,12 @@ void SelectionDAGLegalize::ExpandDYNAMIC_STACKALLOC(SDNode* Node,
   LLVM_DEBUG(dbgs() << "Tmp2:\n";Tmp2.dump(););
 
   LLVM_DEBUG(dbgs() << "ExpandDYNAMIC_STACKALLOC end\n");
+  if(isMemref) {
+    SDValue BaseAddr = DAG.getNode(ISD::WASM_MEMREF_FIELD, dl, VT.changeTypeToInteger(),
+                                   DAG.getConstant(0, dl, Size.getValueType()),
+                                   Tmp1);
+    Tmp1 = DAG.getNode(ISD::WASM_MEMREF_ALLOC, dl, VT, BaseAddr, MemAllocSize, DAG.getConstant(0, dl, Size.getValueType()));
+  }
 
   Results.push_back(Tmp1);
   Results.push_back(Tmp2);
