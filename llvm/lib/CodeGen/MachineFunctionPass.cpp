@@ -73,6 +73,7 @@ bool MachineFunctionPass::runOnFunction(Function &F) {
 
   LLVM_DEBUG(dbgs() << "\t\tcoming Pass Name:\n" << getPassName() << "\n");
   bool RV = runOnMachineFunction(MF);
+  LLVM_DEBUG(dbgs() << MF.getName() << "\t\tMF.dump():\n"; MF.dump(); dbgs()<< "\n");
 
   if (ShouldEmitSizeRemarks) {
     // We wanted size remarks. Check if there was a change to the number of

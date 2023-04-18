@@ -237,6 +237,11 @@ void WebAssemblyDAGToDAGISel::Select(SDNode *Node) {
     SmallVector<SDValue, 16> Ops;
     for (size_t i = 1; i < Node->getNumOperands(); ++i) {
       SDValue Op = Node->getOperand(i);
+      if(Op->getOpcode() == WebAssemblyISD::Wrapper && Op.getValueType().isMemref()) {
+        // memref = WebAssemblyISD::Wrapper (TargetGlobalAddress GV)
+        Op = Op.getOperand(0);
+//        SDValue NewOp = CurDAG->getNode(WebAssembly::GLOBAL_GET_MEMREF, SDLoc(Op), Op.getValueType(), GV);
+      }
       if (i == 1 && Op->getOpcode() == WebAssemblyISD::Wrapper)
         Op = Op->getOperand(0);
       Ops.push_back(Op);
@@ -256,6 +261,29 @@ void WebAssemblyDAGToDAGISel::Select(SDNode *Node) {
         CurDAG->getMachineNode(Results, DL, Node->getVTList(), Link);
     ReplaceNode(Node, CallResults);
     return;
+  }
+  case WebAssemblyISD::Wrapper: {
+    // not match
+    if(Node->getValueType(0).isMemref() && Node->getOperand(0)->getOpcode() == ISD::TargetGlobalAddress) {
+      // TargetGlobalAddress
+      SDValue NewOperand = Node->getOperand(0);
+      for (SDNode::use_iterator UI = Node->use_begin(), UE = Node->use_end(); UI != UE; ) {
+        SDNode *UseNode = *UI++;
+        SmallVector<SDValue, 8> NewOperands;
+        // all UseNode operands
+        for (unsigned i = 0, e = UseNode->getNumOperands(); i != e; ++i) {
+          NewOperands.push_back(UseNode->getOperand(i) == SDValue(Node, 0) ? NewOperand : UseNode->getOperand(i));
+        }
+        SDValue NewUseNode = CurDAG->getNode(UseNode->getOpcode(), SDLoc(UseNode), UseNode->getValueType(0), NewOperands);
+        CurDAG->ReplaceAllUsesWith(SDValue(UseNode, 0), NewUseNode);
+      }
+//      CurDAG->RemoveDeadNode(Node);
+//      } else {
+//
+//      }
+      return;
+    }
+    break;
   }
 
   default:

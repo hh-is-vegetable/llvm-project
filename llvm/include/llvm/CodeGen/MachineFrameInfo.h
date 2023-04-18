@@ -13,6 +13,7 @@
 #ifndef LLVM_CODEGEN_MACHINEFRAMEINFO_H
 #define LLVM_CODEGEN_MACHINEFRAMEINFO_H
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/Register.h"
 #include "llvm/Support/Alignment.h"
@@ -117,6 +118,8 @@ public:
     SSPLK_AddrOf      ///< The address of this allocation is exposed and
                       ///< triggered protection.  3rd closest to the protector.
   };
+
+  SmallDenseMap<int, Register> FrameIdx2Reg;
 
 private:
   // Represent a single object allocated on the stack.

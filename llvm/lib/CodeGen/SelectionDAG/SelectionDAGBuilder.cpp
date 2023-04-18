@@ -1149,6 +1149,7 @@ void SelectionDAGBuilder::visitPHI(const PHINode &) {
 void SelectionDAGBuilder::visit(unsigned Opcode, const User &I) {
   // Note: this doesn't use InstVisitor, because it has to work with
   // ConstantExpr's in addition to instructions.
+  LLVM_DEBUG(dbgs() << "visit Instruction:"; I.dump());
   switch (Opcode) {
   default: llvm_unreachable("Unknown instruction type encountered!");
     // Build the switch statement using the Instruction.def file.
@@ -1547,6 +1548,10 @@ SDValue SelectionDAGBuilder::getValueImpl(const Value *V) {
       return DAG.getGlobalAddress(GV, getCurSDLoc(), VT);
 
     if (isa<ConstantPointerNull>(C)) {
+      if(DAG.getTarget().hasWasmMemref()) {
+        assert(VT.isMemref() && "PointerNull should be memref type as well");
+        return DAG.getNode(ISD::WASM_MEMREF_NULL, getCurSDLoc(), VT);
+      }
       unsigned AS = V->getType()->getPointerAddressSpace();
       return DAG.getConstant(0, getCurSDLoc(),
                              TLI.getPointerTy(DAG.getDataLayout(), AS));
@@ -3235,6 +3240,17 @@ void SelectionDAGBuilder::visitICmp(const User &I) {
 
   EVT DestVT = DAG.getTargetLoweringInfo().getValueType(DAG.getDataLayout(),
                                                         I.getType());
+
+  if(Op1.getValueType().isMemref()) {
+    assert(Op2.getValueType().isMemref() && "Op2 type should be memref");
+    if(!dyn_cast<ICmpInst>(&I)->isEquality()) {
+      EVT PtrIntVT = Op1.getValueType().changeTypeToInteger();
+      Op1 = DAG.getNode(ISD::WASM_MEMREF_FIELD, getCurSDLoc(), PtrIntVT,
+                        DAG.getConstant(0, getCurSDLoc(), PtrIntVT), Op1);
+      Op2 = DAG.getNode(ISD::WASM_MEMREF_FIELD, getCurSDLoc(), PtrIntVT,
+                        DAG.getConstant(0, getCurSDLoc(), PtrIntVT), Op1);
+    }
+  }
   setValue(&I, DAG.getSetCC(getCurSDLoc(), DestVT, Op1, Op2, Opcode));
 }
 
@@ -3490,10 +3506,13 @@ void SelectionDAGBuilder::visitPtrToInt(const User &I) {
   auto &TLI = DAG.getTargetLoweringInfo();
   EVT DestVT = DAG.getTargetLoweringInfo().getValueType(DAG.getDataLayout(),
                                                         I.getType());
-//  if(N.getValueType().isMemref()) {
-//    setValue(&I, DAG.getNode(ISD::PTRTOINT, getCurSDLoc(), DestVT, N));
-//    return;
-//  }
+  if(N.getValueType().isMemref()) {
+    EVT PtrIntegerTy = TLI.getPointerTy(DAG.getDataLayout()).changeTypeToInteger();
+    N = DAG.getNode(ISD::WASM_MEMREF_FIELD, getCurSDLoc(), PtrIntegerTy, DAG.getConstant(0, getCurSDLoc(), PtrIntegerTy), N);
+    N = DAG.getZExtOrTrunc(N, getCurSDLoc(), DestVT);
+    setValue(&I, N);
+    return;
+  }
   EVT PtrMemVT =
       TLI.getMemValueType(DAG.getDataLayout(), I.getOperand(0)->getType());
   N = DAG.getPtrExtOrTrunc(N, getCurSDLoc(), PtrMemVT);
@@ -3507,10 +3526,15 @@ void SelectionDAGBuilder::visitIntToPtr(const User &I) {
   SDValue N = getValue(I.getOperand(0));
   auto &TLI = DAG.getTargetLoweringInfo();
   EVT DestVT = TLI.getValueType(DAG.getDataLayout(), I.getType());
-//  if(DestVT.isMemref()) {
-//    setValue(&I, DAG.getNode(ISD::INTTOPTR, getCurSDLoc(), DestVT, N));
-//    return;
-//  }
+  if(DestVT.isMemref()) {
+    EVT PtrIntTy = DestVT.changeTypeToInteger();
+    if(N.getValueType() != PtrIntTy) {
+      N = DAG.getZExtOrTrunc(N, getCurSDLoc(), PtrIntTy);
+    }
+    setValue(&I, DAG.getNode(ISD::WASM_MEMREF_ALLOC, getCurSDLoc(), DestVT,
+                             N, DAG.getConstant(0, getCurSDLoc(), PtrIntTy), DAG.getConstant(0, getCurSDLoc(), PtrIntTy)));
+    return;
+  }
   EVT PtrMemVT = TLI.getMemValueType(DAG.getDataLayout(), I.getType());
   N = DAG.getZExtOrTrunc(N, getCurSDLoc(), PtrMemVT);
   N = DAG.getPtrExtOrTrunc(N, getCurSDLoc(), DestVT);

@@ -993,9 +993,11 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
   case ISD::WASM_MEMREF_NARROW:
   case ISD::WASM_MEMREF_AND:
   case ISD::WASM_MEMREF_ALLOC:
+  case ISD::WASM_MEMREF_NULL:
     Action = TLI.getOperationAction(Node->getOpcode(), MVT::memref);
     break ;
   case ISD::WASM_MEMREF_FIELD:
+//  case ISD::WASM_MEMREF_EQUAL:
     Action = TLI.getOperationAction(Node->getOpcode(), MVT::i32);
     break ;
   case ISD::GET_DYNAMIC_AREA_OFFSET:

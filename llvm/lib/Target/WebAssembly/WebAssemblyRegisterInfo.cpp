@@ -57,7 +57,6 @@ WebAssemblyRegisterInfo::getReservedRegs(const MachineFunction & /*MF*/) const {
 void WebAssemblyRegisterInfo::eliminateFrameIndex(
     MachineBasicBlock::iterator II, int SPAdj, unsigned FIOperandNum,
     RegScavenger * /*RS*/) const {
-  static std::map<int, Register> FrameIdx2Reg;
   assert(SPAdj == 0);
   MachineInstr &MI = *II;
 
@@ -75,7 +74,8 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
   const auto *TII = MF.getSubtarget<WebAssemblySubtarget>().getInstrInfo();
 
   if(MI.getMF()->getTarget().hasWasmMemref()) {
-    if(!FrameIdx2Reg.count(FrameIndex)) {
+    auto & frameIdx2Reg = MF.getFrameInfo().FrameIdx2Reg;
+    if(!frameIdx2Reg.count(FrameIndex)) {
       Register BaseVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register SizeVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register AttrVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
@@ -95,9 +95,9 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
           .addReg(BaseVal)
           .addReg(SizeVal)
           .addReg(AttrVal);
-      FrameIdx2Reg[FrameIndex] = FrameObjMemRef;
+      frameIdx2Reg[FrameIndex] = FrameObjMemRef;
     }
-    MI.getOperand(FIOperandNum).ChangeToRegister(FrameIdx2Reg[FrameIndex], /*isDef=*/false);
+    MI.getOperand(FIOperandNum).ChangeToRegister(frameIdx2Reg[FrameIndex], /*isDef=*/false);
     return ;
   }
 

@@ -1803,6 +1803,7 @@ bool FastISel::selectOperator(const User *I, unsigned Opcode) {
   case Instruction::PtrToInt: {
     EVT SrcVT = TLI.getValueType(DL, I->getOperand(0)->getType());
     EVT DstVT = TLI.getValueType(DL, I->getType());
+    if(SrcVT.isMemref() || DstVT.isMemref())return false;
     if (DstVT.bitsGT(SrcVT))
       return selectCast(I, ISD::ZERO_EXTEND);
     if (DstVT.bitsLT(SrcVT))

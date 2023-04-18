@@ -1034,7 +1034,13 @@ bool WebAssemblyFastISel::selectSExt(const Instruction *I) {
 bool WebAssemblyFastISel::selectICmp(const Instruction *I) {
   const auto *ICmp = cast<ICmpInst>(I);
 
-  bool I32 = getSimpleType(ICmp->getOperand(0)->getType()) != MVT::i64;
+  auto Op0Ty = getSimpleType(ICmp->getOperand(0)->getType());
+  if(Op0Ty == MVT::memref) {
+    assert(getSimpleType(ICmp->getOperand(1)->getType()) == MVT::memref && "cmp Op0 type is memref, Op1 should be memref as well");
+//    assert(ICmp->isEquality() && "memref only support eq or ne");
+    return false;
+  }
+  bool I32 = Op0Ty != MVT::i64;
   unsigned Opc;
   bool IsSigned = false;
   switch (ICmp->getPredicate()) {

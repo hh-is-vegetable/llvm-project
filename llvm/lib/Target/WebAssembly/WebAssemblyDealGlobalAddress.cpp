@@ -69,88 +69,74 @@ bool WebAssemblyDealGlobalAddress::runOnMachineFunction(MachineFunction &MF) {
   MachineRegisterInfo &MRI = MF.getRegInfo();
   const auto *TII = MF.getSubtarget<WebAssemblySubtarget>().getInstrInfo();
 
-  for (MachineBasicBlock::iterator I = MF.begin()->begin(),
-                                   E = MF.begin()->end();
-       I != E;) {
-    MachineInstr &MI = *I++;
+  for(auto& MBB : MF) {
+    for (MachineBasicBlock::iterator I = MBB.begin(),
+                                     E = MBB.end();
+         I != E;) {
+      MachineInstr &MI = *I++;
 
-    unsigned NumOperands = MI.getNumOperands();
-    for(unsigned Idx = 0; Idx < NumOperands; Idx++) {
-      MachineOperand& MO = MI.getOperand(Idx);
-      // try to find the MI, whose Machine Operand is global value
-      if(MO.isGlobal()) {
-        const auto *GV = MO.getGlobal();
-        LLVM_DEBUG(dbgs() << "Global Machine Operand:"; GV->dump());
-        StringRef GVName = GV->getName();
-        // Global may be "@val + 4", 4 is the offset
-        int64_t GVOffset = MO.getOffset();
-        MO.setOffset(0);
+      unsigned NumOperands = MI.getNumOperands();
+      for (unsigned Idx = 0; Idx < NumOperands; Idx++) {
+        MachineOperand &MO = MI.getOperand(Idx);
+        // try to find the MI, whose Machine Operand is global value
+        if (MO.isGlobal() && !MO.getGlobal()->getValueType()->isFunctionTy()) {
+          const auto *GV = MO.getGlobal();
+          LLVM_DEBUG(dbgs() << "Global Machine Operand:"; GV->dump());
+//          if(GV->hasLocalLinkage())
+          StringRef GVName = GV->getName();
+          // Global may be "@val + 4", 4 is the offset
+          int64_t GVOffset = MO.getOffset();
+          MO.setOffset(0);
 
-        // create symbol: .global.Name
-//        auto *Sym = MF.getContext().getOrCreateSymbol(GVName);
+          // create global symbol
+          auto *sym = MF.getContext().getOrCreateSymbol(GVName);
+          MCSymbolWasm *Sym = cast<MCSymbolWasm>(sym);
+          Sym->setType(wasm::WASM_SYMBOL_TYPE_GLOBAL);
 
-//        const char *ES = "__stack_pointer";
-//        auto *SPSymbol = MF.createExternalSymbolName(ES);
-//        BuildMI(MBB, InsertPt, DL, TII->get(getOpcGlobGet(MF)), SPReg)
-//            .addExternalSymbol(SPSymbol);
-        auto * sym = MF.getContext().getOrCreateSymbol(GVName);
-        MCSymbolWasm* Sym = cast<MCSymbolWasm>(sym);
-        Sym->setType(wasm::WASM_SYMBOL_TYPE_GLOBAL);
+          // set symbol GlobalType
+          wasm::WasmGlobalType GlobalType = {wasm::WASM_TYPE_MEMREF, false};
+          Sym->setGlobalType(GlobalType);
+          LLVM_DEBUG(dbgs() << "create or get wasm global sym:"; Sym->dump());
 
-//        // global size and type
-//        uint64_t TySize =
-//            MF.getDataLayout().getTypeAllocSize(GV->getValueType()).getKnownMinSize();
-//        const auto *SizeExpr = MCConstantExpr::create(TySize, MF.getContext());
-//        Sym->setSize(SizeExpr);
-////        sym->setGlobalSize(TySize);
-        wasm::WasmGlobalType GlobalType = {wasm::WASM_TYPE_MEMREF, false};
-        Sym->setGlobalType(GlobalType);
+          Register GVReg = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
 
-        LLVM_DEBUG(dbgs() << "create or get wasm global sym:"; Sym->dump());
-        Register Dest = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
+          // current global_get should in correct position, if MI GV, Reg0, Reg1..., then global_get GV should before MO0 in stack
+          unsigned RegIdx = Idx + 1;
+          for (; RegIdx < NumOperands; RegIdx++)
+            if (MI.getOperand(RegIdx).isReg() &&
+                !MI.getOperand(RegIdx).isImplicit())
+              break;
+          MachineInstr *InsertMI =  &MI;
+          if (RegIdx < NumOperands) {
+            InsertMI = MRI.getVRegDef(MI.getOperand(RegIdx).getReg());
+          }
 
-        // current global_get should in correct position, if MI GV, Reg0, Reg1..., then global_get GV should before MO0 in stack
-        unsigned RegIdx = Idx+1;
-        for(;RegIdx < NumOperands; RegIdx++)if(MI.getOperand(RegIdx).isReg() && !MI.getOperand(RegIdx).isImplicit())break;
-        MachineInstr * InsertMI = nullptr;
-        if(RegIdx < NumOperands ) {
-          InsertMI = MRI.getVRegDef(MI.getOperand(RegIdx).getReg());
+          // build new MI
+          BuildMI(*InsertMI->getParent(), InsertMI, InsertMI->getDebugLoc(),
+                  TII->get(WebAssembly::GLOBAL_GET_MEMREF), GVReg)
+              .addSym(sym);
+
+          // deal Offset
+          if (GVOffset) {
+            Register OffsetReg = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
+            BuildMI(*InsertMI->getParent(), InsertMI, InsertMI->getDebugLoc(),
+                    TII->get(WebAssembly::CONST_I32), OffsetReg)
+                .addImm(GVOffset);// i32.const GVOffset
+
+            Register AddResReg = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
+            BuildMI(*InsertMI->getParent(), InsertMI, InsertMI->getDebugLoc(),
+                    TII->get(WebAssembly::MEMREF_ADD), AddResReg)
+                .addReg(GVReg)
+                .addReg(OffsetReg); // memref.add GV, Offset
+            GVReg = AddResReg;
+          }
+          // change to Reg
+          MO.ChangeToRegister(GVReg, false);
+
+          Changed = true;
         }
-        if(InsertMI == nullptr)InsertMI = &MI;
-
-        // build new MI
-        BuildMI(*InsertMI->getParent(), InsertMI, InsertMI->getDebugLoc(), TII->get(WebAssembly::GLOBAL_GET_MEMREF), Dest)
-            .addSym(sym);
-//        BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::GLOBAL_GET_MEMREF), Dest)
-//            .addSym(Sym);
-
-        // deal Offset
-        if(GVOffset) {
-          // fixme:we can refer to WebAssemblyRegisterInfo.cpp
-          //  WebAssembly::getNamedOperandIdx(
-          //      MI.getOpcode(), WebAssembly::OpName::addr)
-
-          // i32.const GVOffset
-          Register I32Reg = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
-          BuildMI(*InsertMI->getParent(), InsertMI, InsertMI->getDebugLoc(), TII->get(WebAssembly::CONST_I32), I32Reg)
-              .addImm(GVOffset);
-          // memref.add
-          Register newReg = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
-          BuildMI(*InsertMI->getParent(), InsertMI, InsertMI->getDebugLoc(), TII->get(WebAssembly::MEMREF_ADD), newReg)
-            .addReg(Dest)
-            .addReg(I32Reg);
-
-          Dest = newReg;
-        }
-
-        // change to Reg
-        MO.ChangeToRegister(Dest, false);
-
-        Changed = true;
       }
     }
-
   }
-
   return Changed;
 }
