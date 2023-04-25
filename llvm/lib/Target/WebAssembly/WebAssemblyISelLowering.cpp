@@ -98,11 +98,13 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
     }
   }
 
-  setOperationAction(ISD::GlobalAddress, MVTPtr, Custom);
-  setOperationAction(ISD::GlobalTLSAddress, MVTPtr, Custom);
-  setOperationAction(ISD::ExternalSymbol, MVTPtr, Custom);
-  setOperationAction(ISD::JumpTable, MVTPtr, Custom);
-  setOperationAction(ISD::BlockAddress, MVTPtr, Custom);
+  for (auto T : {MVT::i32, MVT::memref}) {
+    setOperationAction(ISD::GlobalAddress, T, Custom);
+    setOperationAction(ISD::GlobalTLSAddress, T, Custom);
+    setOperationAction(ISD::ExternalSymbol, T, Custom);
+    setOperationAction(ISD::JumpTable, T, Custom);
+    setOperationAction(ISD::BlockAddress, T, Custom);
+  }
   setOperationAction(ISD::BRIND, MVT::Other, Custom);
 
   // Take the default expansion for va_arg, va_copy, and va_end. There is no
@@ -283,7 +285,7 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
   setOperationAction(ISD::CopyToReg, MVT::Other, Custom);
 
   // Expand these forms; we pattern-match the forms that we can handle in isel.
-  for (auto T : {MVT::i32, MVT::i64, MVT::f32, MVT::f64})
+  for (auto T : {MVT::i32, MVT::i64, MVT::f32, MVT::f64, MVT::memref})
     for (auto Op : {ISD::BR_CC, ISD::SELECT_CC})
       setOperationAction(Op, T, Expand);
 
@@ -1143,11 +1145,18 @@ WebAssemblyTargetLowering::LowerCall(CallLoweringInfo &CLI,
     // is) turn it into a TargetGlobalAddress node so that LowerGlobalAddress
     // doesn't at MO_GOT which is not needed for direct calls.
     GlobalAddressSDNode* GA = cast<GlobalAddressSDNode>(Callee);
+    EVT GVTy = getPointerTy(Layout);
+    unsigned WrapperOpcode = WebAssemblyISD::Wrapper;
+    if(GVTy.isMemref()) {
+      assert(GA->getValueType(0) == EVT(MVT::i32)
+             && "Callee should be i32 when pointer is memref");
+      GVTy = GA->getValueType(0);
+    }
     Callee = DAG.getTargetGlobalAddress(GA->getGlobal(), DL,
-                                        getPointerTy(DAG.getDataLayout()),
+                                        GVTy,
                                         GA->getOffset());
-    Callee = DAG.getNode(WebAssemblyISD::Wrapper, DL,
-                         getPointerTy(DAG.getDataLayout()), Callee);
+    Callee = DAG.getNode(WrapperOpcode, DL,
+                         GVTy.getSimpleVT(), Callee);
   }
 
   // Compute the operands for the CALLn node.
@@ -1773,6 +1782,7 @@ SDValue WebAssemblyTargetLowering::LowerGlobalAddress(SDValue Op,
   LLVM_DEBUG(dbgs() << "\n " << "MVT:" << VT.getEVTString());
   LLVM_DEBUG(dbgs() << "end of LowerGlobalAddress\n" );
 
+  unsigned WrapperOpcode = VT.isMemref() ? WebAssemblyISD::Wrapper_Memref : WebAssemblyISD::Wrapper;
   unsigned OperandFlags = 0;
   if (isPositionIndependent()) {
     LLVM_DEBUG(dbgs() << "here is in isPositionIndependent\n" );
@@ -1790,7 +1800,7 @@ SDValue WebAssemblyTargetLowering::LowerGlobalAddress(SDValue Op,
         OperandFlags = WebAssemblyII::MO_MEMORY_BASE_REL;
       }
       SDValue BaseAddr =
-          DAG.getNode(WebAssemblyISD::Wrapper, DL, PtrVT,
+          DAG.getNode(WrapperOpcode, DL, PtrVT,
                       DAG.getTargetExternalSymbol(BaseName, PtrVT));
 
       SDValue SymAddr = DAG.getNode(
@@ -1803,7 +1813,7 @@ SDValue WebAssemblyTargetLowering::LowerGlobalAddress(SDValue Op,
     OperandFlags = WebAssemblyII::MO_GOT;
   }
 
-  return DAG.getNode(WebAssemblyISD::Wrapper, DL, VT,
+  return DAG.getNode(WrapperOpcode, DL, VT,
                      DAG.getTargetGlobalAddress(GA->getGlobal(), DL, VT,
                                                 GA->getOffset(), OperandFlags));
 }
@@ -1816,7 +1826,9 @@ WebAssemblyTargetLowering::LowerExternalSymbol(SDValue Op,
   EVT VT = Op.getValueType();
   assert(ES->getTargetFlags() == 0 &&
          "Unexpected target flags on generic ExternalSymbolSDNode");
-  return DAG.getNode(WebAssemblyISD::Wrapper, DL, VT,
+
+  unsigned WrapperOpcode = VT.isMemref() ? WebAssemblyISD::Wrapper_Memref : WebAssemblyISD::Wrapper;
+  return DAG.getNode(WrapperOpcode, DL, VT,
                      DAG.getTargetExternalSymbol(ES->getSymbol(), VT));
 }
 

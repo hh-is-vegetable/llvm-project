@@ -1401,8 +1401,8 @@ void WasmObjectWriter::prepareImports(
         assert(WasmIndices.count(&WS) == 0);
         WasmIndices[&WS] = NumFunctionImports++;
       } else if (WS.isGlobal()) {
-        if (WS.isWeak())
-          report_fatal_error("undefined global symbol cannot be weak");
+//        if (WS.isWeak())
+//          report_fatal_error("undefined global symbol cannot be weak");
 
         wasm::WasmImport Import;
         Import.Field = WS.getImportName();

@@ -61,6 +61,9 @@ void llvm::computeSignatureVTs(const FunctionType *Ty,
   computeLegalValueVTs(ContextFunc, TM, Ty->getReturnType(), Results);
 
   MVT PtrVT = MVT::getIntegerVT(TM.createDataLayout().getPointerSizeInBits());
+  if(TM.hasWasmMemref()) {
+    PtrVT = TM.getSubtarget<WebAssemblySubtarget>(ContextFunc).getTargetLowering()->getPointerTy(ContextFunc.getParent()->getDataLayout());
+  }
   if (Results.size() > 1 &&
       !TM.getSubtarget<WebAssemblySubtarget>(ContextFunc).hasMultivalue()) {
     // WebAssembly can't lower returns of multiple values without demoting to

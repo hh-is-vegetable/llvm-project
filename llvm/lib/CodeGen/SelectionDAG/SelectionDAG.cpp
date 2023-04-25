@@ -1437,6 +1437,7 @@ SDValue SelectionDAG::getConstant(const ConstantInt &Val, const SDLoc &DL,
 //    MVT IntVT = MVT::getIntegerVT(AddrBitWidth);
 //    return getConstant(Int, DL, IntVT);
 //  }
+  assert(!VT.isMemref() && "Cannot create Memref constant Node!");
   assert(VT.isInteger() && "Cannot create FP integer constant!");
 
   EVT EltVT = VT.getScalarType();
@@ -9988,7 +9989,7 @@ SDValue SelectionDAG::getSymbolFunctionGlobalAddress(SDValue Op,
 
   if (Function != nullptr) {
     auto PtrTy = TLI->getPointerTy(getDataLayout(), Function->getAddressSpace());
-    return getGlobalAddress(Function, SDLoc(Op), PtrTy);
+    return getGlobalAddress(Function, SDLoc(Op), PtrTy.isMemref() ? PtrTy.changeTypeToInteger() : PtrTy);
   }
 
   std::string ErrorStr;

@@ -32,6 +32,8 @@
 #include <functional>
 #include <utility>
 
+#include "llvm/CodeGen/TargetLowering.h"
+
 namespace llvm {
 
 namespace Intrinsic {
@@ -1404,6 +1406,9 @@ public:
   /// \return true when scalable vectorization is preferred.
   bool enableScalableVectorization() const;
 
+  /// \return true when pointer should be memref type.
+  bool hasMemrefType() const;
+
   /// \name Vector Predication Information
   /// @{
   /// Whether the target supports the %evl parameter of VP intrinsic efficiently
@@ -1781,6 +1786,7 @@ public:
   virtual InstructionCost getInstructionLatency(const Instruction *I) = 0;
   virtual VPLegalization
   getVPLegalizationStrategy(const VPIntrinsic &PI) const = 0;
+  virtual bool hasMemrefType() const = 0;
 };
 
 template <typename T>
@@ -2399,6 +2405,9 @@ public:
   VPLegalization
   getVPLegalizationStrategy(const VPIntrinsic &PI) const override {
     return Impl.getVPLegalizationStrategy(PI);
+  }
+  bool hasMemrefType() const override {
+    return Impl.hasMemrefType();
   }
 };
 

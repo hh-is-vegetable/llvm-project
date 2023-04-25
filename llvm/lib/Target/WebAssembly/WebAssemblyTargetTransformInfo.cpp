@@ -113,6 +113,10 @@ bool WebAssemblyTTIImpl::areInlineCompatible(const Function *Caller,
   return (CallerBits & CalleeBits) == CalleeBits;
 }
 
+bool WebAssemblyTTIImpl::hasMemrefType() const{
+  return getTLI()->getPointerTy(getDataLayout()).isMemref();
+}
+
 void WebAssemblyTTIImpl::getUnrollingPreferences(
     Loop *L, ScalarEvolution &SE, TTI::UnrollingPreferences &UP,
     OptimizationRemarkEmitter *ORE) const {

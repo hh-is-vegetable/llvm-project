@@ -1548,13 +1548,14 @@ SDValue SelectionDAGBuilder::getValueImpl(const Value *V) {
       return DAG.getGlobalAddress(GV, getCurSDLoc(), VT);
 
     if (isa<ConstantPointerNull>(C)) {
-      if(DAG.getTarget().hasWasmMemref()) {
-        assert(VT.isMemref() && "PointerNull should be memref type as well");
+      if(DAG.getTarget().hasWasmMemref() && VT.isMemref()) { // Null for Function pointer is not memref
+//        assert(VT.isMemref() && "PointerNull should be memref type as well");
         return DAG.getNode(ISD::WASM_MEMREF_NULL, getCurSDLoc(), VT);
       }
       unsigned AS = V->getType()->getPointerAddressSpace();
+      EVT PtrTy = TLI.getPointerTy(DAG.getDataLayout(), AS);
       return DAG.getConstant(0, getCurSDLoc(),
-                             TLI.getPointerTy(DAG.getDataLayout(), AS));
+                             PtrTy.isMemref() ? PtrTy.changeTypeToInteger() : PtrTy);
     }
 
     if (match(C, m_VScale(DAG.getDataLayout())))
@@ -2559,6 +2560,7 @@ void SelectionDAGBuilder::visitJumpTable(SwitchCG::JumpTable &JT) {
   // Emit the code for the jump table
   assert(JT.Reg != -1U && "Should lower JT Header first!");
   EVT PTy = DAG.getTargetLoweringInfo().getPointerTy(DAG.getDataLayout());
+  if(PTy.isMemref())PTy = PTy.changeTypeToInteger();
   SDValue Index = DAG.getCopyFromReg(getControlRoot(), getCurSDLoc(),
                                      JT.Reg, PTy);
   SDValue Table = DAG.getJumpTable(JT.JTI, PTy);
@@ -2587,10 +2589,11 @@ void SelectionDAGBuilder::visitJumpTableHeader(SwitchCG::JumpTable &JT,
   // This value may be smaller or larger than the target's pointer type, and
   // therefore require extension or truncating.
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
-  SwitchOp = DAG.getZExtOrTrunc(Sub, dl, TLI.getPointerTy(DAG.getDataLayout()));
+  MVT PtrMVT = TLI.getPointerTy(DAG.getDataLayout());
+  SwitchOp = DAG.getZExtOrTrunc(Sub, dl, PtrMVT.isMemref() ? PtrMVT.changeTypeToInteger() : PtrMVT);
 
   unsigned JumpTableReg =
-      FuncInfo.CreateReg(TLI.getPointerTy(DAG.getDataLayout()));
+      FuncInfo.CreateReg(PtrMVT.isMemref() ? PtrMVT.changeTypeToInteger() : PtrMVT);
   SDValue CopyTo = DAG.getCopyToReg(getControlRoot(), dl,
                                     JumpTableReg, SwitchOp);
   JT.Reg = JumpTableReg;
@@ -3243,7 +3246,7 @@ void SelectionDAGBuilder::visitICmp(const User &I) {
 
   if(Op1.getValueType().isMemref()) {
     assert(Op2.getValueType().isMemref() && "Op2 type should be memref");
-    if(!dyn_cast<ICmpInst>(&I)->isEquality()) {
+    if(!ICmpInst::isEquality(predicate)) {
       EVT PtrIntVT = Op1.getValueType().changeTypeToInteger();
       Op1 = DAG.getNode(ISD::WASM_MEMREF_FIELD, getCurSDLoc(), PtrIntVT,
                         DAG.getConstant(0, getCurSDLoc(), PtrIntVT), Op1);
@@ -5873,9 +5876,11 @@ static unsigned FixedPointIntrinsicToOpcode(unsigned Intrinsic) {
 void SelectionDAGBuilder::lowerCallToExternalSymbol(const CallInst &I,
                                            const char *FunctionName) {
   assert(FunctionName && "FunctionName must not be nullptr");
+  MVT FuncTy = DAG.getTargetLoweringInfo().getPointerTy(DAG.getDataLayout());
+  if(FuncTy.isMemref())FuncTy = FuncTy.changeTypeToInteger();
   SDValue Callee = DAG.getExternalSymbol(
       FunctionName,
-      DAG.getTargetLoweringInfo().getPointerTy(DAG.getDataLayout()));
+      FuncTy);
   LowerCallTo(I, Callee, I.isTailCall(), I.isMustTailCall());
 }
 
@@ -9977,7 +9982,11 @@ TargetLowering::LowerCallTo(TargetLowering::CallLoweringInfo &CLI) const {
     MachineFunction &MF = CLI.DAG.getMachineFunction();
     Align HiddenSRetAlign = MF.getFrameInfo().getObjectAlign(DemoteStackIdx);
     for (unsigned i = 0; i < NumValues; ++i) {
-      SDValue Add = CLI.DAG.getNode(ISD::ADD, CLI.DL, PtrVT, DemoteStackSlot,
+      SDValue Add = PtrVT.isMemref() ?
+           CLI.DAG.getNode(ISD::WASM_MEMREF_ADD, CLI.DL, PtrVT, DemoteStackSlot,
+                           CLI.DAG.getConstant(Offsets[i], CLI.DL,
+                                               PtrVT.changeTypeToInteger()), Flags)
+          : CLI.DAG.getNode(ISD::ADD, CLI.DL, PtrVT, DemoteStackSlot,
                                     CLI.DAG.getConstant(Offsets[i], CLI.DL,
                                                         PtrVT), Flags);
       SDValue L = CLI.DAG.getLoad(

@@ -8362,6 +8362,7 @@ bool SLPVectorizerPass::tryToVectorizeList(ArrayRef<Value *> VL, BoUpSLP &R,
   // determining vectorization factor for scalar instructions.
   for (Value *V : VL) {
     Type *Ty = V->getType();
+    if(Ty->isPointerTy() && TTI->hasMemrefType())return false;
     if (!isa<InsertElementInst>(V) && !isValidElementType(Ty)) {
       // NOTE: the following will give user internal llvm type name, which may
       // not be useful.

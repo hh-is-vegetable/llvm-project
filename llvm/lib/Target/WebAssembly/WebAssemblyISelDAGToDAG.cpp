@@ -237,10 +237,9 @@ void WebAssemblyDAGToDAGISel::Select(SDNode *Node) {
     SmallVector<SDValue, 16> Ops;
     for (size_t i = 1; i < Node->getNumOperands(); ++i) {
       SDValue Op = Node->getOperand(i);
-      if(Op->getOpcode() == WebAssemblyISD::Wrapper && Op.getValueType().isMemref()) {
+      if(Op->getOpcode() == WebAssemblyISD::Wrapper_Memref && Op.getValueType().isMemref()) {
         // memref = WebAssemblyISD::Wrapper (TargetGlobalAddress GV)
         Op = Op.getOperand(0);
-//        SDValue NewOp = CurDAG->getNode(WebAssembly::GLOBAL_GET_MEMREF, SDLoc(Op), Op.getValueType(), GV);
       }
       if (i == 1 && Op->getOpcode() == WebAssemblyISD::Wrapper)
         Op = Op->getOperand(0);
@@ -262,7 +261,7 @@ void WebAssemblyDAGToDAGISel::Select(SDNode *Node) {
     ReplaceNode(Node, CallResults);
     return;
   }
-  case WebAssemblyISD::Wrapper: {
+  case WebAssemblyISD::Wrapper_Memref: {
     // not match
     if(Node->getValueType(0).isMemref() && Node->getOperand(0)->getOpcode() == ISD::TargetGlobalAddress) {
       // TargetGlobalAddress

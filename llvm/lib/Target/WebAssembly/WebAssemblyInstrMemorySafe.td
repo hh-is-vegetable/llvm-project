@@ -47,6 +47,12 @@ def SDTMrefNull : SDTypeProfile<1, 0, [
   SDTCisVT<0, memref>
 ]>;
 
+
+def SDT_WebAssemblyWrapper_Memref    : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
+                                                     SDTCisPtrTy<0>]>;
+def WebAssemblyWrapper_Memref  : SDNode<"WebAssemblyISD::Wrapper_Memref",
+                                 SDT_WebAssemblyWrapper_Memref>;
+
 // mrefadd
 def mrefadd : SDNode<"ISD::WASM_MEMREF_ADD", SDTMrefBinary, []>;
 
@@ -158,7 +164,7 @@ defm : MSLoadPatImmOff<memref, load, regMemrefPlusImm, "MSLOAD_MEMREF">;
 
 // for global. so normal global will be replaced by load instead of global_get
 multiclass LoadPatGlobalAddr<ValueType ty, SDPatternOperator kind, string inst> {
-  def : Pat<(ty (kind (WebAssemblyWrapper tglobaladdr:$mref))),
+  def : Pat<(ty (kind (WebAssemblyWrapper_Memref tglobaladdr:$mref))),
             (!cast<NI>(inst # "_A32") 0, 0, tglobaladdr:$mref)>,
         Requires<[IsNotPIC, HasAddr32]>;
 }
@@ -319,7 +325,7 @@ defm : MSStorePatImmOff<memref, store, regMemrefPlusImm, "MSSTORE_MEMREF">;
 
 // for global
 multiclass StorePatGlobalAddr<ValueType ty, PatFrag kind, string inst> {
-  def : Pat<(kind ty:$val, (WebAssemblyWrapper tglobaladdr:$mref)),
+  def : Pat<(kind ty:$val, (WebAssemblyWrapper_Memref tglobaladdr:$mref)),
             (!cast<NI>(inst # "_A32") 0, 0, tglobaladdr:$mref,
              ty:$val)>,
         Requires<[HasAddr32]>;
@@ -331,10 +337,10 @@ defm : StorePatGlobalAddr<f32, store, "MSSTORE_F32">;
 defm : StorePatGlobalAddr<f64, store, "MSSTORE_F64">;
 defm : StorePatGlobalAddr<memref, store, "MSSTORE_MEMREF">;
 
-def : Pat<(store (WebAssemblyWrapper tglobaladdr:$val), memref:$mref),
+def : Pat<(store (WebAssemblyWrapper_Memref tglobaladdr:$val), memref:$mref),
           (MSSTORE_MEMREF_A32 0, 0, memref:$mref, tglobaladdr:$val)>,
         Requires<[HasAddr32]>;
-def : Pat<(store (WebAssemblyWrapper tglobaladdr:$val), (WebAssemblyWrapper tglobaladdr:$mref)),
+def : Pat<(store (WebAssemblyWrapper_Memref tglobaladdr:$val), (WebAssemblyWrapper_Memref tglobaladdr:$mref)),
           (MSSTORE_MEMREF_A32 0, 0, tglobaladdr:$mref, tglobaladdr:$val)>,
         Requires<[HasAddr32]>;
 
@@ -395,7 +401,7 @@ defm MEMREF_NARROW : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$base, I32:$si
                 "memref.narrow\t$res, $mref, $base, $size",
                 "memref.narrow\t", 0xde>;
 
-def : Pat<(memref (mrefnarrow (WebAssemblyWrapper tglobaladdr:$mref), I32:$base, I32:$size)),
+def : Pat<(memref (mrefnarrow (WebAssemblyWrapper_Memref tglobaladdr:$mref), I32:$base, I32:$size)),
           (MEMREF_NARROW tglobaladdr:$mref, I32:$base, I32:$size)>,
       Requires<[IsNotPIC, HasAddr32]>;
 
@@ -405,21 +411,21 @@ defm MEMREF_FIELD : I<(outs I32:$res), (ins i32imm_op:$idx, MEMREF:$mref),
                 "memref.field\t$res, $idx, $mref",
                 "memref.field\t$idx", 0xdf>;
 
-def : Pat<(mreffield imm_i32:$idx, (WebAssemblyWrapper tglobaladdr:$mref)),
+def : Pat<(mreffield imm_i32:$idx, (WebAssemblyWrapper_Memref tglobaladdr:$mref)),
           (MEMREF_FIELD imm:$idx, tglobaladdr:$mref)>,
       Requires<[IsNotPIC, HasAddr32]>;
-def : Pat<(mreffield imm_i32_target:$idx, (WebAssemblyWrapper tglobaladdr:$mref)),
+def : Pat<(mreffield imm_i32_target:$idx, (WebAssemblyWrapper_Memref tglobaladdr:$mref)),
           (MEMREF_FIELD imm:$idx, tglobaladdr:$mref)>,
       Requires<[IsNotPIC, HasAddr32]>;
 def : Pat<(mreffield imm_i32:$idx, MEMREF:$mref),
           (MEMREF_FIELD imm:$idx, MEMREF:$mref)>,
       Requires<[IsNotPIC, HasAddr32]>;
 
-def : Pat<(memref (mrefand (WebAssemblyWrapper tglobaladdr:$mref), I32:$val)),
+def : Pat<(memref (mrefand (WebAssemblyWrapper_Memref tglobaladdr:$mref), I32:$val)),
           (MEMREF_AND tglobaladdr:$mref, I32:$val)>,
       Requires<[IsNotPIC, HasAddr32]>;
 
-def : Pat<(memref (mrefadd (WebAssemblyWrapper tglobaladdr:$mref), I32:$val)),
+def : Pat<(memref (mrefadd (WebAssemblyWrapper_Memref tglobaladdr:$mref), I32:$val)),
           (MEMREF_ADD tglobaladdr:$mref, I32:$val)>,
       Requires<[IsNotPIC, HasAddr32]>;
 

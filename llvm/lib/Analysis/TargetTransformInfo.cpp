@@ -1086,6 +1086,10 @@ bool TargetTransformInfo::enableScalableVectorization() const {
   return TTIImpl->enableScalableVectorization();
 }
 
+bool TargetTransformInfo::hasMemrefType() const {
+  return TTIImpl->hasMemrefType();
+}
+
 bool TargetTransformInfo::hasActiveVectorLength(unsigned Opcode, Type *DataType,
                                                 Align Alignment) const {
   return TTIImpl->hasActiveVectorLength(Opcode, DataType, Alignment);

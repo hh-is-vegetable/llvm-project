@@ -1439,8 +1439,13 @@ public:
   EVT getValueType(const DataLayout &DL, Type *Ty,
                    bool AllowUnknown = false) const {
     // Lower scalar pointers to native pointer types.
-    if (auto *PTy = dyn_cast<PointerType>(Ty))
-      return getPointerTy(DL, PTy->getAddressSpace());
+    if (auto *PTy = dyn_cast<PointerType>(Ty)) {
+      EVT rt = getPointerTy(DL, PTy->getAddressSpace());
+      if (rt.isMemref() && dyn_cast<FunctionType>(PTy->getPointerElementType())) {
+        rt = rt.changeTypeToInteger();
+      }
+      return rt;
+    }
 
     if (auto *VTy = dyn_cast<VectorType>(Ty)) {
       Type *EltTy = VTy->getElementType();
@@ -1459,9 +1464,13 @@ public:
   EVT getMemValueType(const DataLayout &DL, Type *Ty,
                       bool AllowUnknown = false) const {
     // Lower scalar pointers to native pointer types.
-    if (PointerType *PTy = dyn_cast<PointerType>(Ty))
-      return getPointerMemTy(DL, PTy->getAddressSpace());
-    else if (VectorType *VTy = dyn_cast<VectorType>(Ty)) {
+    if (PointerType *PTy = dyn_cast<PointerType>(Ty)) {
+      EVT rt = getPointerMemTy(DL, PTy->getAddressSpace());
+      if (rt.isMemref() && dyn_cast<FunctionType>(PTy->getPointerElementType())) {
+        rt = rt.changeTypeToInteger();
+      }
+      return rt;
+    } else if (VectorType *VTy = dyn_cast<VectorType>(Ty)) {
       Type *Elm = VTy->getElementType();
       if (PointerType *PT = dyn_cast<PointerType>(Elm)) {
         EVT PointerTy(getPointerMemTy(DL, PT->getAddressSpace()));
