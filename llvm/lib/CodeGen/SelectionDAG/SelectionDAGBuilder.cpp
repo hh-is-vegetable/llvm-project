@@ -3251,7 +3251,7 @@ void SelectionDAGBuilder::visitICmp(const User &I) {
       Op1 = DAG.getNode(ISD::WASM_MEMREF_FIELD, getCurSDLoc(), PtrIntVT,
                         DAG.getConstant(0, getCurSDLoc(), PtrIntVT), Op1);
       Op2 = DAG.getNode(ISD::WASM_MEMREF_FIELD, getCurSDLoc(), PtrIntVT,
-                        DAG.getConstant(0, getCurSDLoc(), PtrIntVT), Op1);
+                        DAG.getConstant(0, getCurSDLoc(), PtrIntVT), Op2);
     }
   }
   setValue(&I, DAG.getSetCC(getCurSDLoc(), DestVT, Op1, Op2, Opcode));
@@ -3457,9 +3457,10 @@ void SelectionDAGBuilder::visitFPTrunc(const User &I) {
   SDLoc dl = getCurSDLoc();
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
   EVT DestVT = TLI.getValueType(DAG.getDataLayout(), I.getType());
+  EVT PtrVT = TLI.getPointerTy(DAG.getDataLayout());
   setValue(&I, DAG.getNode(ISD::FP_ROUND, dl, DestVT, N,
                            DAG.getTargetConstant(
-                               0, dl, TLI.getPointerTy(DAG.getDataLayout()))));
+                               0, dl, PtrVT.isMemref() ? PtrVT.changeTypeToInteger() : PtrVT)));
 }
 
 void SelectionDAGBuilder::visitFPExt(const User &I) {
@@ -4898,11 +4899,12 @@ void SelectionDAGBuilder::visitTargetIntrinsic(const CallInst &I,
                                                DAG.getMachineFunction(),
                                                Intrinsic);
 
+  EVT PtrTy = TLI.getPointerTy(DAG.getDataLayout());
   // Add the intrinsic ID as an integer operand if it's not a target intrinsic.
   if (!IsTgtIntrinsic || Info.opc == ISD::INTRINSIC_VOID ||
       Info.opc == ISD::INTRINSIC_W_CHAIN)
     Ops.push_back(DAG.getTargetConstant(Intrinsic, getCurSDLoc(),
-                                        TLI.getPointerTy(DAG.getDataLayout())));
+                                        PtrTy.isMemref() ? PtrTy.changeTypeToInteger() : PtrTy));
 
   // Add all operands of the call to the operand list.
   for (unsigned i = 0, e = I.arg_size(); i != e; ++i) {
@@ -8807,8 +8809,9 @@ void SelectionDAGBuilder::visitInlineAsm(const CallBase &Call,
 
   // Remember the HasSideEffect, AlignStack, AsmDialect, MayLoad and MayStore
   // bits as operand 3.
+  EVT PtrTy = TLI.getPointerTy(DAG.getDataLayout());
   AsmNodeOperands.push_back(DAG.getTargetConstant(
-      ExtraInfo.get(), getCurSDLoc(), TLI.getPointerTy(DAG.getDataLayout())));
+      ExtraInfo.get(), getCurSDLoc(), PtrTy.isMemref() ? PtrTy.changeTypeToInteger() : PtrTy));
 
   // Third pass: Loop over operands to prepare DAG-level operands.. As part of
   // this, assign virtual and physical registers for inputs and otput.

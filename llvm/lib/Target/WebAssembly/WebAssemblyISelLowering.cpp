@@ -753,6 +753,9 @@ WebAssemblyTargetLowering::getRegForInlineAsmConstraint(
           break;
         }
       }
+      if (VT.isMemref() && !VT.isVector()) {
+        return std::make_pair(0U, &WebAssembly::MEMREFRegClass);
+      }
       break;
     default:
       break;
@@ -1128,7 +1131,10 @@ WebAssemblyTargetLowering::LowerCall(CallLoweringInfo &CLI,
              "ArgLocs should remain in order and only hold varargs args");
       unsigned Offset = ArgLocs[ValNo++].getLocMemOffset();
       FINode = DAG.getFrameIndex(FI, getPointerTy(Layout));
-      SDValue Add = DAG.getNode(ISD::ADD, DL, PtrVT, FINode,
+      SDValue Add = PtrVT.isMemref() ?
+          DAG.getNode(ISD::WASM_MEMREF_ADD, DL, PtrVT, FINode,
+                      DAG.getConstant(Offset, DL, PtrVT.changeTypeToInteger())) :
+          DAG.getNode(ISD::ADD, DL, PtrVT, FINode,
                                 DAG.getConstant(Offset, DL, PtrVT));
       Chains.push_back(
           DAG.getStore(Chain, DL, Arg, Add,

@@ -1793,7 +1793,7 @@ uint64_t WasmObjectWriter::writeOneObject(MCAssembler &Asm,
         assert(WasmIndices.count(&WS) == 0);
         WasmIndices[&WS] = WasmIndex;
         LLVM_DEBUG(dbgs() << "  -> index:" << WasmIndex << "\n");
-      } else if (Base->isData()) {
+      } else if (Base->isData() || (WS.isData() || Base->isGlobal())) {
         auto &DataSection = static_cast<MCSectionWasm &>(WS.getSection());
         uint64_t Offset = Layout.getSymbolOffset(S);
         int64_t Size = 0;

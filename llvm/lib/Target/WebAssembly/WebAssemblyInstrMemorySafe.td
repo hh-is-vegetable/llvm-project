@@ -301,6 +301,10 @@ defm : MSStorePatImmOff<f32, store, regMemrefPlusImm, "MSSTORE_F32">;
 defm : MSStorePatImmOff<f64, store, regMemrefPlusImm, "MSSTORE_F64">;
 defm : MSStorePatImmOff<memref, store, regMemrefPlusImm, "MSSTORE_MEMREF">;
 
+def : Pat<(store (WebAssemblyWrapper_Memref tglobaladdr:$val), (regMemrefPlusImm MEMREF:$mref, imm_i32:$off)),
+           (MSSTORE_MEMREF_A32 0, imm:$off, MEMREF:$mref, tglobaladdr:$val)>,
+        Requires<[HasAddr32]>;
+
 // no need CONST_MEMREF
 // Select stores with just a constant offset.
 // multiclass MSStorePatOffsetOnly<ValueType ty, PatFrag kind, string inst> {
@@ -372,12 +376,12 @@ defm : StorePatGlobalAddr<i64, truncstorei8, "MSSTORE8_I64">;
 defm : StorePatGlobalAddr<i64, truncstorei16, "MSSTORE16_I64">;
 defm : StorePatGlobalAddr<i64, truncstorei32, "MSSTORE32_I64">;
 
-// defm MEMREF_NULL : I<(outs MEMREF:$dst), (ins),
-//                         (outs), (ins),
-//                         [(set MEMREF:$dst, (!cast<Intrinsic>("int_wasm_memref_null")))],
-//                         "memref.null\t$dst",
-//                         "memref.null\t", 0xfa>,
-//                       Requires<[HasAddr32]>;
+// defm MEMREF_CONST : I<(outs MEMREF:$res), 
+//                       (ins i32imm_op:$base, i32imm_op:$size, i32imm_op:$attr),
+//                       (outs), (ins i32imm_op:$base, i32imm_op:$size, i32imm_op:$attr),
+//                       [],
+//                       "memref.const\t$res, $base, $size, $attr",
+//                       "memref.const\t$base, $size, $attr", 0xda>;
 
 defm MEMREF_ADD : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$val), (outs), (ins),
                 [(set MEMREF:$res, (mrefadd MEMREF:$mref, I32:$val))],
@@ -433,11 +437,29 @@ defm MEMREF_EQ : I<(outs I32:$res), (ins MEMREF:$lhs, MEMREF:$rhs), (outs), (ins
                 [(set I32:$res, (setcc MEMREF:$lhs, MEMREF:$rhs, SETEQ))],
                 "memref.eq\t$res, $lhs, $rhs",
                 "memref.eq", 0xc5>;
+def : Pat<(i32 (setcc (WebAssemblyWrapper_Memref tglobaladdr:$lhs), 
+            MEMREF:$rhs, SETEQ)),
+          (MEMREF_EQ tglobaladdr:$lhs, MEMREF:$rhs)>;
+def : Pat<(i32 (setcc MEMREF:$lhs, 
+            (WebAssemblyWrapper_Memref tglobaladdr:$rhs), SETEQ)),
+          (MEMREF_EQ MEMREF:$lhs, tglobaladdr:$rhs)>;
+def : Pat<(i32 (setcc (WebAssemblyWrapper_Memref tglobaladdr:$lhs), 
+            (WebAssemblyWrapper_Memref tglobaladdr:$rhs), SETEQ)),
+          (MEMREF_EQ tglobaladdr:$lhs, tglobaladdr:$rhs)>;
 
 defm MEMREF_NE : I<(outs I32:$res), (ins MEMREF:$lhs, MEMREF:$rhs), (outs), (ins),
                 [(set I32:$res, (setcc MEMREF:$lhs, MEMREF:$rhs, SETNE))],
                 "memref.ne\t$res, $lhs, $rhs",
                 "memref.ne", 0xc6>;
+def : Pat<(i32 (setcc (WebAssemblyWrapper_Memref tglobaladdr:$lhs), 
+            MEMREF:$rhs, SETNE)),
+          (MEMREF_NE tglobaladdr:$lhs, MEMREF:$rhs)>;
+def : Pat<(i32 (setcc MEMREF:$lhs, 
+            (WebAssemblyWrapper_Memref tglobaladdr:$rhs), SETNE)),
+          (MEMREF_NE MEMREF:$lhs, tglobaladdr:$rhs)>;
+def : Pat<(i32 (setcc (WebAssemblyWrapper_Memref tglobaladdr:$lhs), 
+            (WebAssemblyWrapper_Memref tglobaladdr:$rhs), SETNE)),
+          (MEMREF_NE tglobaladdr:$lhs, tglobaladdr:$rhs)>;
 
 // c5 ~ cf is available
 defm MEMREF_NULL : I<(outs MEMREF:$res), (ins), 
@@ -446,13 +468,27 @@ defm MEMREF_NULL : I<(outs MEMREF:$res), (ins),
                 "memref.null\t$res",
                 "memref.null\t", 0xc7>;
 
-defm MEMREF_CONST : I<(outs MEMREF:$res), 
-                      (ins i32imm_op:$base, i32imm_op:$size, i32imm_op:$attr),
-                      (outs), (ins i32imm_op:$base, i32imm_op:$size, i32imm_op:$attr),
-                      [],
-                      "memref.const\t$res, $base, $size, $attr",
-                      "memref.const\t$base, $size, $attr", 0xda>;
-// def : Pat<(memref (WebAssemblyWrapper tglobaladdr:$addr)),
-//           (tglobaladdr:$addr)>, Requires<[IsPIC, HasAddr32]>;
-// def : Pat<(memref (WebAssemblyWrapper tglobaladdr:$addr)),
+defm SELECT_MEMREF : I<(outs MEMREF:$dst), (ins MEMREF:$lhs, MEMREF:$rhs, I32:$cond),
+                    (outs), (ins),
+                    [(set MEMREF:$dst, (select I32:$cond, MEMREF:$lhs, MEMREF:$rhs))],
+                    "memref.select\t$dst, $lhs, $rhs, $cond", "memref.select", 0xc8>;
+
+def : Pat<(select (i32 (setne I32:$cond, 0)), MEMREF:$lhs, MEMREF:$rhs),
+          (SELECT_MEMREF MEMREF:$lhs, MEMREF:$rhs, I32:$cond)>;
+
+def : Pat<(select (i32 (seteq I32:$cond, 0)), MEMREF:$lhs, MEMREF:$rhs),
+          (SELECT_MEMREF MEMREF:$rhs, MEMREF:$lhs, I32:$cond)>;
+
+def : Pat<(select I32:$cond, 
+              (WebAssemblyWrapper_Memref tglobaladdr:$lhs), MEMREF:$rhs),
+              (SELECT_MEMREF tglobaladdr:$lhs, MEMREF:$rhs, I32:$cond)>;
+def : Pat<(select I32:$cond, 
+              MEMREF:$lhs, (WebAssemblyWrapper_Memref tglobaladdr:$rhs)),
+              (SELECT_MEMREF MEMREF:$lhs, tglobaladdr:$rhs, I32:$cond)>;
+def : Pat<(select I32:$cond, 
+              (WebAssemblyWrapper_Memref tglobaladdr:$lhs), 
+              (WebAssemblyWrapper_Memref tglobaladdr:$rhs)),
+              (SELECT_MEMREF tglobaladdr:$lhs, tglobaladdr:$rhs, I32:$cond)>;
+
+// def : Pat<(memref (WebAssemblyWrapper_Memref tglobaladdr:$addr)),
 //           (GLOBAL_GET_MEMREF tglobaladdr:$addr)>, Requires<[HasAddr32]>;

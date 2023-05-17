@@ -262,23 +262,25 @@ void WebAssemblyDAGToDAGISel::Select(SDNode *Node) {
     return;
   }
   case WebAssemblyISD::Wrapper_Memref: {
+    LLVM_DEBUG(dbgs() << "WebAssemblyISD::Wrapper_Memref Select:\n" ; Node->dump() ; CurDAG->dump());
     // not match
     if(Node->getValueType(0).isMemref() && Node->getOperand(0)->getOpcode() == ISD::TargetGlobalAddress) {
+      assert(Node->use_size() != 0  && "Wrapper_Memref select failed!");
       // TargetGlobalAddress
-      SDValue NewOperand = Node->getOperand(0);
-      for (SDNode::use_iterator UI = Node->use_begin(), UE = Node->use_end(); UI != UE; ) {
-        SDNode *UseNode = *UI++;
-        SmallVector<SDValue, 8> NewOperands;
+      SDValue TargetGlobalAddr = Node->getOperand(0);
+      SmallVector<SDValue, 1> NewValues;
+      NewValues.push_back(TargetGlobalAddr);
+      CurDAG->ReplaceAllUsesWith(Node, NewValues.data());
+//      for (SDNode::use_iterator UI = Node->use_begin(), UE = Node->use_end(); UI != UE; ++UI) {
+//        SDNode *UseNode = *UI;
+//        SmallVector<SDValue, 8> NewOperands;
         // all UseNode operands
-        for (unsigned i = 0, e = UseNode->getNumOperands(); i != e; ++i) {
-          NewOperands.push_back(UseNode->getOperand(i) == SDValue(Node, 0) ? NewOperand : UseNode->getOperand(i));
-        }
-        SDValue NewUseNode = CurDAG->getNode(UseNode->getOpcode(), SDLoc(UseNode), UseNode->getValueType(0), NewOperands);
-        CurDAG->ReplaceAllUsesWith(SDValue(UseNode, 0), NewUseNode);
-      }
-//      CurDAG->RemoveDeadNode(Node);
-//      } else {
-//
+//        for (unsigned i = 0, e = UseNode->getNumOperands(); i != e; ++i) {
+//          NewOperands.push_back(UseNode->getOperand(i) == SDValue(Node, 0) ? TargetGlobalAddr
+//                                    : UseNode->getOperand(i));
+//        }
+//        SDValue NewUseNode = CurDAG->getNode(UseNode->getOpcode(), SDLoc(UseNode), UseNode->getValueType(0), NewOperands);
+//        CurDAG->ReplaceAllUsesWith(SDValue(UseNode, 0), NewUseNode);
 //      }
       return;
     }
