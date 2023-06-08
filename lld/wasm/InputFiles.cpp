@@ -584,6 +584,7 @@ Symbol *ObjFile::createDefined(const WasmSymbol &sym) {
     // segment.
     if (!(flags & WASM_SYMBOL_TLS) && seg->isTLS())
       flags |= WASM_SYMBOL_TLS;
+    // if the symbol is a local DefinedData, it couldn't be a global symbol
     if (sym.isBindingLocal())
       return make<DefinedData>(name, flags, this, seg, offset, size);
     if (seg->discarded)
@@ -595,12 +596,13 @@ Symbol *ObjFile::createDefined(const WasmSymbol &sym) {
     uint64_t offset = sym.Info.DataRef.Offset;
     uint64_t size = sym.Info.DataRef.Size;
     // create InputGlobal*
-    llvm::wasm::WasmGlobal wasmGlobal;
-    bool is64 = config->is64.getValueOr(false);
-    wasmGlobal.Type = {uint8_t(is64 ? WASM_TYPE_I64 : WASM_TYPE_MEMREF), false};
-    wasmGlobal.InitExpr = is64 ? intConst(0, is64) : memrefAlloc(0, 0, 0,is64);
-    wasmGlobal.SymbolName = name;
-    InputGlobal *global = make<InputGlobal>(wasmGlobal, nullptr);
+    InputGlobal* global = createInputGlobal(name, this);
+//    llvm::wasm::WasmGlobal wasmGlobal;
+//    bool is64 = config->is64.getValueOr(false);
+//    wasmGlobal.Type = {uint8_t(is64 ? WASM_TYPE_I64 : WASM_TYPE_MEMREF), false};
+//    wasmGlobal.InitExpr = is64 ? intConst(0, is64) : memrefAlloc(0, 0, 0,is64);
+//    wasmGlobal.SymbolName = name;
+//    InputGlobal *global = make<InputGlobal>(wasmGlobal, this);
     globals.push_back(global);
     // create DefinedGlobal
     if (sym.isBindingLocal())

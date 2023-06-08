@@ -7007,12 +7007,13 @@ SDValue SelectionDAG::getMemcpy(SDValue Chain, const SDLoc &dl, SDValue Dst,
   Entry.Node = Size; Args.push_back(Entry);
   // FIXME: pass in SDLoc
   TargetLowering::CallLoweringInfo CLI(*this);
+  MVT PtrMVT = TLI->getPointerTy(getDataLayout());
   CLI.setDebugLoc(dl)
       .setChain(Chain)
       .setLibCallee(TLI->getLibcallCallingConv(RTLIB::MEMCPY),
                     Dst.getValueType().getTypeForEVT(*getContext()),
                     getExternalSymbol(TLI->getLibcallName(RTLIB::MEMCPY),
-                                      TLI->getPointerTy(getDataLayout())),
+                                      PtrMVT.isMemref() ? PtrMVT.changeTypeToInteger() : PtrMVT),
                     std::move(Args))
       .setDiscardResult()
       .setTailCall(isTailCall);
@@ -7211,12 +7212,13 @@ SDValue SelectionDAG::getMemset(SDValue Chain, const SDLoc &dl, SDValue Dst,
 
   // FIXME: pass in SDLoc
   TargetLowering::CallLoweringInfo CLI(*this);
+  MVT PtrMVT = TLI->getPointerTy(getDataLayout());
   CLI.setDebugLoc(dl)
       .setChain(Chain)
       .setLibCallee(TLI->getLibcallCallingConv(RTLIB::MEMSET),
                     Dst.getValueType().getTypeForEVT(*getContext()),
                     getExternalSymbol(TLI->getLibcallName(RTLIB::MEMSET),
-                                      TLI->getPointerTy(getDataLayout())),
+                                      PtrMVT.isMemref() ? PtrMVT.changeTypeToInteger() : PtrMVT),
                     std::move(Args))
       .setDiscardResult()
       .setTailCall(isTailCall);

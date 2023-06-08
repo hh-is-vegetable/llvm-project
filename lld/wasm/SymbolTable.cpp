@@ -24,6 +24,19 @@ namespace lld {
 namespace wasm {
 SymbolTable *symtab;
 
+// add this function for createDefinedData/Global
+InputGlobal* createInputGlobal(StringRef name, ObjFile* f) {
+  llvm::wasm::WasmGlobal wasmGlobal;
+  bool is64 = config->is64.getValueOr(false);
+  wasmGlobal.Type = {uint8_t(is64 ? WASM_TYPE_I64 : WASM_TYPE_MEMREF), false};
+  wasmGlobal.InitExpr = is64 ? intConst(0, is64) : memrefAlloc(0, 0, 0, is64);
+  wasmGlobal.SymbolName = name;
+  InputGlobal *global = make<InputGlobal>(wasmGlobal, f);
+  if(f)
+    f->globals.push_back(global);
+  return global;
+}
+
 void SymbolTable::addFile(InputFile *file) {
   log("Processing: " + toString(file));
 
@@ -370,6 +383,19 @@ Symbol *SymbolTable::addDefinedData(StringRef name, uint32_t flags,
     replaceSymbol<DefinedData>(s, name, flags, file, segment, address, size);
   };
 
+  // may get an inserted one which is global symbol
+  // if the current is not weak symbol, then it should be Defined Global finally
+  // s may be a lazy symbol, but it doesn't matter
+  // for c example:
+  //   extern int a;
+  //   void func() { a += 1;}
+  if(isa<GlobalSymbol>(s) && (flags & WASM_SYMBOL_BINDING_MASK) != WASM_SYMBOL_BINDING_WEAK) {
+    // get InputGlobal
+    InputGlobal* g = createInputGlobal(name, dyn_cast_or_null<ObjFile>(file));
+    replaceSymbol<DefinedGlobal>(s, name, flags, file, segment, address, size, g);
+    return s;
+  }
+
   if (wasInserted || s->isLazy()) {
     replaceSym();
     return s;
@@ -396,7 +422,8 @@ Symbol *SymbolTable::addDefinedGlobal(StringRef name, uint32_t flags,
     replaceSymbol<DefinedGlobal>(s, name, flags, file, segment, value, size, global);
   };
 
-  if (wasInserted || s->isLazy()) {
+  // s may be an inserted data symbol
+  if (wasInserted || s->isLazy() || isa<DataSymbol>(s)) {
     replaceSym();
     return s;
   }
@@ -567,12 +594,15 @@ Symbol *SymbolTable::addUndefinedData(StringRef name, uint32_t flags,
 
   if (wasInserted) {
     replaceSymbol<UndefinedData>(s, name, flags, file);
-  } else if (auto *lazy = dyn_cast<LazySymbol>(s)) {
+  } else if (auto *lazy = dyn_cast<LazySymbol>(s)) { // existed one is lazySymbol
     if ((flags & WASM_SYMBOL_BINDING_MASK) == WASM_SYMBOL_BINDING_WEAK)
       lazy->setWeak();
     else
-      lazy->fetch();
+      lazy->fetch(); // load file
   } else if (s->isDefined()) {
+    // the inserted s could be a defined global, we return it and do nothing
+    if(isa<GlobalSymbol>(s))return s;
+    // or the inserted s is a defined data, we check it
     checkDataType(s, file);
   }
   return s;
@@ -597,8 +627,16 @@ Symbol *SymbolTable::addUndefinedGlobal(StringRef name,
                                    file, type);
   else if (auto *lazy = dyn_cast<LazySymbol>(s))
     lazy->fetch();
-  else if (s->isDefined())
-    checkGlobalType(s, file, type);
+  else if (s->isDefined()) {
+    // s may be a defined data symbol, we replace it and get defined global
+    if(isa<DataSymbol>(s)) {
+      DefinedData* dd = dyn_cast<DefinedData>(s);
+      InputGlobal* g = createInputGlobal(name, dyn_cast_or_null<ObjFile>(file));
+      replaceSymbol<DefinedGlobal>(s, name, flags, file, dd->segment, dd->getVA(), dd->getSize(), g);
+    } else {
+      checkGlobalType(s, file, type);
+    }
+  }
   return s;
 }
 

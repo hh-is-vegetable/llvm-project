@@ -147,6 +147,8 @@ private:
 
 extern SymbolTable *symtab;
 
+InputGlobal* createInputGlobal(StringRef name, ObjFile* f = nullptr);
+
 } // namespace wasm
 } // namespace lld
 
