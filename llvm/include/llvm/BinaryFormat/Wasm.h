@@ -471,7 +471,7 @@ inline bool operator==(const WasmTableType &LHS, const WasmTableType &RHS) {
 std::string toString(WasmSymbolType type);
 std::string relocTypetoString(uint32_t type);
 bool relocTypeHasAddend(uint32_t type);
-
+//std::string toString(wasm::ValType Type);
 } // end namespace wasm
 } // end namespace llvm
 

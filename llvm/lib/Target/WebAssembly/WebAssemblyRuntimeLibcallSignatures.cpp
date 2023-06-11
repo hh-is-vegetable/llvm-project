@@ -23,6 +23,9 @@
 #include "llvm/CodeGen/RuntimeLibcalls.h"
 #include "llvm/Support/ManagedStatic.h"
 
+#include "llvm/Support/Debug.h"
+#define DEBUG_TYPE "wasm-global-address"
+
 using namespace llvm;
 
 namespace {
@@ -74,6 +77,8 @@ enum RuntimeLibcallSignature {
   i64_i64_func_i64_i64_i32,
   iPTR_func_iPTR_i32_iPTR,
   iPTR_func_iPTR_iPTR_iPTR,
+  iPTR_func_iPTR_iPTR_i32,
+  iPTR_func_iPTR_i32_i32,
   f32_func_f32_f32_f32,
   f64_func_f64_f64_f64,
   func_i64_i64_iPTR_iPTR,
@@ -322,8 +327,8 @@ struct RuntimeLibcallSignatureTable {
     Table[RTLIB::UO_F128] = i32_func_i64_i64_i64_i64;
 
     // Memory
-    Table[RTLIB::MEMCPY] = iPTR_func_iPTR_iPTR_iPTR;
-    Table[RTLIB::MEMSET] = iPTR_func_iPTR_i32_iPTR;
+    Table[RTLIB::MEMCPY] = iPTR_func_iPTR_iPTR_i32;//iPTR_func_iPTR_iPTR_iPTR;
+    Table[RTLIB::MEMSET] = iPTR_func_iPTR_i32_i32;//iPTR_func_iPTR_i32_iPTR;
     Table[RTLIB::MEMMOVE] = iPTR_func_iPTR_iPTR_iPTR;
 
     // __stack_chk_fail
@@ -521,7 +526,7 @@ void llvm::getLibcallSignature(const WebAssemblySubtarget &Subtarget,
   assert(Params.empty());
 
   wasm::ValType PtrTy =
-      Subtarget.hasAddr64() ? wasm::ValType::I64 : wasm::ValType::I32;
+      Subtarget.hasAddr64() ? wasm::ValType::I64 : wasm::ValType::MEMREF;//wasm::ValType::I32;
 
   auto &Table = RuntimeLibcallSignatures->Table;
   switch (Table[LC]) {
@@ -880,9 +885,22 @@ void llvm::getLibcallSignature(const WebAssemblySubtarget &Subtarget,
     Params.push_back(wasm::ValType::I64);
     Params.push_back(wasm::ValType::I64);
     break;
+  case iPTR_func_iPTR_i32_i32:
+    Rets.push_back(PtrTy);
+    Params.push_back(PtrTy);
+    Params.push_back(wasm::ValType::I32);
+    Params.push_back(wasm::ValType::I32);
+    break;
+  case iPTR_func_iPTR_iPTR_i32:
+    Rets.push_back(PtrTy);
+    Params.push_back(PtrTy);
+    Params.push_back(PtrTy);
+    Params.push_back(wasm::ValType::I32);
+    break;
   case unsupported:
     llvm_unreachable("unsupported runtime library signature");
   }
+  LLVM_DEBUG(dbgs() << "\n//---/getLibCall signature:" << Table[LC] << "/---//\n");
 }
 
 static ManagedStatic<StaticLibcallNameMap> LibcallNameMap;
@@ -894,6 +912,7 @@ void llvm::getLibcallSignature(const WebAssemblySubtarget &Subtarget,
                                SmallVectorImpl<wasm::ValType> &Params) {
   auto &Map = LibcallNameMap->Map;
   auto Val = Map.find(Name);
+  LLVM_DEBUG(dbgs() << "\n//---/getLibCall Name:" << Name << "/---//\n");
 #ifndef NDEBUG
   if (Val == Map.end()) {
     auto message = std::string("unexpected runtime library name: ") +
