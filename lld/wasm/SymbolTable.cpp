@@ -387,10 +387,13 @@ Symbol *SymbolTable::addDefinedData(StringRef name, uint32_t flags,
   // if the current is not weak symbol, then it should be Defined Global finally
   // s may be a lazy symbol, but it doesn't matter
   // for c example:
-  //   extern int a;
+  //   extern int a; // undefined global
   //   void func() { a += 1;}
   if(isa<GlobalSymbol>(s) && (flags & WASM_SYMBOL_BINDING_MASK) != WASM_SYMBOL_BINDING_WEAK) {
-    // get InputGlobal
+    // the existing one is global
+    // if it is DefinedGlobal, we just return
+    if(s->isDefined())return s;
+    // if it is UndefinedGlobal, we create InputGlobal
     InputGlobal* g = createInputGlobal(name, dyn_cast_or_null<ObjFile>(file));
     replaceSymbol<DefinedGlobal>(s, name, flags, file, segment, address, size, g);
     return s;
@@ -605,6 +608,7 @@ Symbol *SymbolTable::addUndefinedData(StringRef name, uint32_t flags,
     // or the inserted s is a defined data, we check it
     checkDataType(s, file);
   }
+  // if the existing symbole is undefined global, we just return it as well
   return s;
 }
 
@@ -622,7 +626,8 @@ Symbol *SymbolTable::addUndefinedGlobal(StringRef name,
   if (s->traced)
     printTraceSymbolUndefined(name, file);
 
-  if (wasInserted)
+  // the existing symbol could be an undefined data, like "export int A;" but no use before here
+  if (wasInserted || isa<UndefinedData>(s))
     replaceSymbol<UndefinedGlobal>(s, name, importName, importModule, flags,
                                    file, type);
   else if (auto *lazy = dyn_cast<LazySymbol>(s))
@@ -631,6 +636,7 @@ Symbol *SymbolTable::addUndefinedGlobal(StringRef name,
     // s may be a defined data symbol, we replace it and get defined global
     if(isa<DataSymbol>(s)) {
       DefinedData* dd = dyn_cast<DefinedData>(s);
+      // the existing symbol is defined data, there is no global which has same name, so create InputGlobal
       InputGlobal* g = createInputGlobal(name, dyn_cast_or_null<ObjFile>(file));
       replaceSymbol<DefinedGlobal>(s, name, flags, file, dd->segment, dd->getVA(), dd->getSize(), g);
     } else {
