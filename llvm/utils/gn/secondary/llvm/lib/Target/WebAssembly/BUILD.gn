@@ -36,11 +36,12 @@ static_library("LLVMWebAssemblyCodeGen") {
     "WebAssemblyAsmPrinter.cpp",
     "WebAssemblyCFGSort.cpp",
     "WebAssemblyCFGStackify.cpp",
+    "WebAssemblyChangePrivateGlobal.cpp",
+    "WebAssemblyDealGlobalAddress.cpp",
     "WebAssemblyDebugFixup.cpp",
     "WebAssemblyDebugValueManager.cpp",
     "WebAssemblyExceptionInfo.cpp",
     "WebAssemblyExplicitLocals.cpp",
-    "WebAssemblyDealGlobalAddress.cpp"
     "WebAssemblyFastISel.cpp",
     "WebAssemblyFixBrTableDefaults.cpp",
     "WebAssemblyFixFunctionBitcasts.cpp",

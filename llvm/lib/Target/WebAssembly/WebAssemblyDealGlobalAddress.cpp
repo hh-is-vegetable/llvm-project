@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/WebAssemblyMCTargetDesc.h"
-#include "Utils/WebAssemblyUtilities.h"
 #include "WebAssembly.h"
 #include "WebAssemblyDebugValueManager.h"
 #include "WebAssemblyMachineFunctionInfo.h"
@@ -23,10 +22,12 @@
 #include "llvm/CodeGen/MachineBlockFrequencyInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
-#include "llvm/CodeGen/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/MC/MCContext.h"
+#include "llvm/IR/GlobalValue.h"
+#include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "wasm-global-address"
@@ -88,6 +89,14 @@ bool WebAssemblyDealGlobalAddress::runOnMachineFunction(MachineFunction &MF) {
             // Global may be "@val + 4", 4 is the offset
             int64_t GVOffset = MO.getOffset();
             MO.setOffset(0);
+
+            // change the global value when it has follow attr
+            // it is necessary, or it will be deleted after create symbol
+//            if(GV->hasGlobalUnnamedAddr() || GV->hasPrivateLinkage()) {
+//              GlobalValue* GVToChange = const_cast<GlobalValue *>(GV);
+//              if(GV->hasGlobalUnnamedAddr()) GVToChange->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::None);
+//              if(GV->hasPrivateLinkage()) GVToChange->setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
+//            }
 
             // create global symbol
             auto *sym = MF.getContext().getOrCreateSymbol(GVName);

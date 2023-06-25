@@ -58,6 +58,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeWebAssemblyTarget() {
   initializeWebAssemblyLowerEmscriptenEHSjLjPass(PR);
   initializeLowerGlobalDtorsPass(PR);
   initializeFixFunctionBitcastsPass(PR);
+  initializeChangePrivateGlobalPass(PR);
   initializeOptimizeReturnedPass(PR);
   initializeWebAssemblyArgumentMovePass(PR);
   initializeWebAssemblySetP2AlignOperandsPass(PR);
@@ -425,6 +426,9 @@ void WebAssemblyPassConfig::addIRPasses() {
   // Fix function bitcasts, as WebAssembly requires caller and callee signatures
   // to match.
   addPass(createWebAssemblyFixFunctionBitcasts());
+
+  // change private global, as the private or unnamed_addr global should be change
+  addPass(createWebAssemblyChangePrivateGlobal());
 
   // Optimize "returned" function attributes.
   if (getOptLevel() != CodeGenOpt::None)
