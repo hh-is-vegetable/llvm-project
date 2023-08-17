@@ -624,8 +624,12 @@ unsigned WebAssemblyFastISel::fastMaterializeConstant(const Constant *C) {
                                                : &WebAssembly::I32RegClass);
     unsigned Opc = Subtarget->hasAddr64() ? WebAssembly::CONST_I64
                                           : WebAssembly::CONST_I32;
-    BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc, TII.get(Opc), ResultReg)
-        .addGlobalAddress(GV);
+    if (GV->getValueType()->isFunctionTy()) {
+      BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc, TII.get(Opc), ResultReg)
+          .addGlobalAddress(GV);
+    } else {
+      return 0;
+    }
     return ResultReg;
   }
 

@@ -1447,6 +1447,7 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
   // Iterate over all basic blocks in the function.
   StackProtector &SP = getAnalysis<StackProtector>();
   for (const BasicBlock *LLVMBB : RPOT) {
+    std::string BBName = LLVMBB->getName().str();
     if (OptLevel != CodeGenOpt::None) {
       bool AllPredsVisited = true;
       for (const BasicBlock *Pred : predecessors(LLVMBB)) {

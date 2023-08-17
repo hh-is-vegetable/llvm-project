@@ -490,5 +490,5 @@ def : Pat<(select I32:$cond,
               (WebAssemblyWrapper_Memref tglobaladdr:$rhs)),
               (SELECT_MEMREF tglobaladdr:$lhs, tglobaladdr:$rhs, I32:$cond)>;
 
-// def : Pat<(memref (WebAssemblyWrapper_Memref tglobaladdr:$addr)),
-//           (GLOBAL_GET_MEMREF tglobaladdr:$addr)>, Requires<[HasAddr32]>;
+def : Pat<(memref (WebAssemblyWrapper_Memref tglobaladdr:$addr)),
+          (GLOBAL_GET_Addr tglobaladdr:$addr)>, Requires<[HasAddr32]>;

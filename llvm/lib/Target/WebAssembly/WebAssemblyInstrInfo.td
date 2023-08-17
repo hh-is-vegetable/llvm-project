@@ -149,6 +149,8 @@ let OperandType = "OPERAND_GLOBAL" in {
   // symbol, which to LLVM is a pointer, so in wasm64 mode it is easiest to
   // pretend we use a 64-bit index for it.
   def global_op64 : Operand<i64>;
+
+  def global_op_memref: Operand<memref>;
 }
 
 let OperandType = "OPERAND_I32IMM" in
@@ -352,6 +354,11 @@ multiclass LOCAL<WebAssemblyRegClass rc, Operand global_op> {
               (!cast<NI>("LOCAL_SET_" # rc) timm:$local, vt:$src)>;
   }
 }
+let mayLoad = 1 in
+defm GLOBAL_GET_Addr : I<(outs MEMREF:$res), (ins global_op_memref:$addr),
+                        (outs), (ins global_op_memref:$addr), [],
+                          "global.get\t$res, $addr", "global.get\t$addr",
+                        0x23>;
 defm "" : LOCAL<I32, global_op32>;
 defm "" : LOCAL<I64, global_op64>;  // 64-bit only needed for pointers.
 defm "" : LOCAL<F32, global_op32>;

@@ -261,31 +261,40 @@ void WebAssemblyDAGToDAGISel::Select(SDNode *Node) {
     ReplaceNode(Node, CallResults);
     return;
   }
+/*
   case WebAssemblyISD::Wrapper_Memref: {
     LLVM_DEBUG(dbgs() << "WebAssemblyISD::Wrapper_Memref Select:\n" ; Node->dump() ; CurDAG->dump());
-    // not match
     if(Node->getValueType(0).isMemref() && Node->getOperand(0)->getOpcode() == ISD::TargetGlobalAddress) {
       assert(Node->use_size() != 0  && "Wrapper_Memref select failed!");
       // TargetGlobalAddress
       SDValue TargetGlobalAddr = Node->getOperand(0);
       SmallVector<SDValue, 1> NewValues;
-      NewValues.push_back(TargetGlobalAddr);
-      CurDAG->ReplaceAllUsesWith(Node, NewValues.data());
-//      for (SDNode::use_iterator UI = Node->use_begin(), UE = Node->use_end(); UI != UE; ++UI) {
-//        SDNode *UseNode = *UI;
-//        SmallVector<SDValue, 8> NewOperands;
-        // all UseNode operands
-//        for (unsigned i = 0, e = UseNode->getNumOperands(); i != e; ++i) {
-//          NewOperands.push_back(UseNode->getOperand(i) == SDValue(Node, 0) ? TargetGlobalAddr
-//                                    : UseNode->getOperand(i));
-//        }
-//        SDValue NewUseNode = CurDAG->getNode(UseNode->getOpcode(), SDLoc(UseNode), UseNode->getValueType(0), NewOperands);
-//        CurDAG->ReplaceAllUsesWith(SDValue(UseNode, 0), NewUseNode);
-//      }
+      MachineSDNode * newNode;
+      if (GlobalAddressSDNode *GA = dyn_cast<GlobalAddressSDNode>(TargetGlobalAddr.getNode())) {
+        int64_t GVOffset = GA->getOffset();
+        if (GVOffset == 0)break; // we only deal wit GVOffset whose GVOffset is not zero
+        GA.Offset
+        MachineSDNode *GlobalGetNode = CurDAG->getMachineNode(WebAssembly::GLOBAL_GET_Addr, DL, MVT::memref, )
+//        MCContext ctx = MF.getContext();
+//        auto *sym = ctx.getOrCreateSymbol(GVName);
+//        MCSymbolWasm *Sym = cast<MCSymbolWasm>(sym);
+//        Sym->setType(wasm::WASM_SYMBOL_TYPE_GLOBAL);
+//
+//        // set symbol GlobalType
+//        wasm::WasmGlobalType GlobalType = {wasm::WASM_TYPE_MEMREF, false};
+//        Sym->setGlobalType(GlobalType);
+//        Register GVReg =
+//            MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
+      }
+//      NewValues.push_back(TargetGlobalAddr);
+//      CurDAG->ReplaceAllUsesWith(Node, NewValues.data());
+
       return;
+    } else {
+      llvm_unreachable("not support WebAssemblyISD::Wrapper_Memref whose result type is not memref or whose operand is not GlobalAddressSDNode");
     }
-    break;
-  }
+
+  }*/
 
   default:
     break;

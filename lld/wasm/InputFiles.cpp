@@ -173,6 +173,12 @@ uint64_t ObjFile::calcNewValue(const WasmRelocation &reloc, uint64_t tombstone,
   case R_WASM_MEMORY_ADDR_LOCREL_I32: {
     if (isa<UndefinedData>(sym) || sym->isUndefWeak())
       return 0;
+    // when we compile to .o file, symbol may be data type, but it can be global type when link,
+    // but as the reloc type, it is the relocation in data section, so we should return address.
+    // It can not be an undefined global, we just return 0.
+    if(isa<UndefinedGlobal>(sym))return 0;
+    if (auto dg = dyn_cast_or_null<DefinedGlobal>(sym))
+      return dg->getVA() + reloc.Addend;
     auto D = cast<DefinedData>(sym);
     uint64_t value = D->getVA() + reloc.Addend;
     if (reloc.Type == R_WASM_MEMORY_ADDR_LOCREL_I32) {
@@ -603,7 +609,7 @@ Symbol *ObjFile::createDefined(const WasmSymbol &sym) {
 //    wasmGlobal.InitExpr = is64 ? intConst(0, is64) : memrefAlloc(0, 0, 0,is64);
 //    wasmGlobal.SymbolName = name;
 //    InputGlobal *global = make<InputGlobal>(wasmGlobal, this);
-    globals.push_back(global);
+//    globals.push_back(global);
     // create DefinedGlobal
     if (sym.isBindingLocal())
       return make<DefinedGlobal>(name, flags, this, seg, offset, size, global);

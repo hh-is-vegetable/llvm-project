@@ -38,6 +38,7 @@ FunctionPass *createWebAssemblyISelDag(WebAssemblyTargetMachine &TM,
                                        CodeGenOpt::Level OptLevel);
 FunctionPass *createWebAssemblyArgumentMove();
 FunctionPass *createWebAssemblySetP2AlignOperands();
+FunctionPass *createWebAssemblyDealGlobalAddress();
 
 // Late passes.
 FunctionPass *createWebAssemblyReplacePhysRegs();
@@ -53,7 +54,6 @@ FunctionPass *createWebAssemblyLateEHPrepare();
 FunctionPass *createWebAssemblyCFGSort();
 FunctionPass *createWebAssemblyCFGStackify();
 FunctionPass *createWebAssemblyExplicitLocals();
-FunctionPass *createWebAssemblyDealGlobalAddress();
 FunctionPass *createWebAssemblyLowerBrUnless();
 FunctionPass *createWebAssemblyRegNumbering();
 FunctionPass *createWebAssemblyDebugFixup();
@@ -69,6 +69,7 @@ void initializeChangePrivateGlobalPass(PassRegistry &);
 void initializeOptimizeReturnedPass(PassRegistry &);
 void initializeWebAssemblyArgumentMovePass(PassRegistry &);
 void initializeWebAssemblySetP2AlignOperandsPass(PassRegistry &);
+void initializeWebAssemblyDealGlobalAddressPass(PassRegistry &);
 void initializeWebAssemblyReplacePhysRegsPass(PassRegistry &);
 void initializeWebAssemblyNullifyDebugValueListsPass(PassRegistry &);
 void initializeWebAssemblyPrepareForLiveIntervalsPass(PassRegistry &);
@@ -83,7 +84,6 @@ void initializeWebAssemblyExceptionInfoPass(PassRegistry &);
 void initializeWebAssemblyCFGSortPass(PassRegistry &);
 void initializeWebAssemblyCFGStackifyPass(PassRegistry &);
 void initializeWebAssemblyExplicitLocalsPass(PassRegistry &);
-void initializeWebAssemblyDealGlobalAddressPass(PassRegistry &);
 void initializeWebAssemblyLowerBrUnlessPass(PassRegistry &);
 void initializeWebAssemblyRegNumberingPass(PassRegistry &);
 void initializeWebAssemblyDebugFixupPass(PassRegistry &);

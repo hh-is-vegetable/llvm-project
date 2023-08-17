@@ -62,6 +62,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeWebAssemblyTarget() {
   initializeOptimizeReturnedPass(PR);
   initializeWebAssemblyArgumentMovePass(PR);
   initializeWebAssemblySetP2AlignOperandsPass(PR);
+  initializeWebAssemblyDealGlobalAddressPass(PR);
   initializeWebAssemblyReplacePhysRegsPass(PR);
   initializeWebAssemblyPrepareForLiveIntervalsPass(PR);
   initializeWebAssemblyOptimizeLiveIntervalsPass(PR);
@@ -75,7 +76,6 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeWebAssemblyTarget() {
   initializeWebAssemblyCFGSortPass(PR);
   initializeWebAssemblyCFGStackifyPass(PR);
   initializeWebAssemblyExplicitLocalsPass(PR);
-  initializeWebAssemblyDealGlobalAddressPass(PR);
   initializeWebAssemblyLowerBrUnlessPass(PR);
   initializeWebAssemblyRegNumberingPass(PR);
   initializeWebAssemblyDebugFixupPass(PR);
@@ -478,6 +478,9 @@ bool WebAssemblyPassConfig::addInstSelector() {
   // Eliminate range checks and add default targets to br_table instructions.
   addPass(createWebAssemblyFixBrTableDefaults());
 
+  // Insert global.get
+  addPass(createWebAssemblyDealGlobalAddress());
+
   return false;
 }
 
@@ -556,9 +559,6 @@ void WebAssemblyPassConfig::addPreEmitPass() {
   // Insert explicit local.get and local.set operators.
   if (!WasmDisableExplicitLocals)
     addPass(createWebAssemblyExplicitLocals());
-
-  // Insert global.get
-  addPass(createWebAssemblyDealGlobalAddress());
 
   // Lower br_unless into br_if.
   addPass(createWebAssemblyLowerBrUnless());

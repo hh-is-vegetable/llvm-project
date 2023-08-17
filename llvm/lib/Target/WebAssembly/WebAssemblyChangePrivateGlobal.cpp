@@ -74,13 +74,13 @@ bool ChangePrivateGlobal::runOnModule(Module &M) {
       }
       if(GV.isConstant() && GV.hasInitializer()) {
         LLVM_DEBUG(dbgs() << "global " << GV.getName() << " is const and has initializer:";GV.getInitializer()->dump());
-//        GV.setName("new_str");
         if(ConstantDataArray* CDA = dyn_cast_or_null<ConstantDataArray>(GV.getInitializer())) {
           if (CDA->isString()) {
             StringRef content = CDA->getAsString();
             unsigned hashV = (unsigned)llvm::hash_value(content);
             std::string newName = "str_" + std::to_string(hashV);
             GV.setName(newName);
+            LLVM_DEBUG(dbgs() << "global new name:" << newName << "\n");
           }
         }
       }
