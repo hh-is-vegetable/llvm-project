@@ -470,10 +470,12 @@ void GlobalSection::writeBody() {
     WasmGlobalType type{itype, mutable_};
     WasmInitExpr initExpr;
     if (auto *d = dyn_cast<DefinedData>(sym))
-      initExpr = intConst(d->getVA(), is64);
-    else if (auto *f = dyn_cast<FunctionSymbol>(sym))
+      initExpr = memrefAlloc(d->getVA(), d->getSize(), 0, is64);
+//      initExpr = intConst(d->getVA(), is64);
+    else if (auto *f = dyn_cast<FunctionSymbol>(sym)) {
+      itype = WASM_TYPE_I32;
       initExpr = intConst(f->isStub ? 0 : f->getTableIndex(), is64);
-    else {
+    } else {
       assert(isa<UndefinedData>(sym));
       initExpr = intConst(0, is64);
     }
