@@ -1653,8 +1653,8 @@ SDValue WebAssemblyTargetLowering::LowerCopyToReg(SDValue Op,
     SDLoc DL(Op);
     Register Reg = cast<RegisterSDNode>(Op.getOperand(1))->getReg();
     EVT VT = Src.getValueType();
-    SDValue Copy(DAG.getMachineNode(VT == MVT::i32 ? WebAssembly::COPY_I32
-                                                   : WebAssembly::COPY_I64,
+    SDValue Copy(DAG.getMachineNode(VT.isMemref() ? WebAssembly::COPY_MEMREF : (VT == MVT::i32 ? WebAssembly::COPY_I32
+                                                   : WebAssembly::COPY_I64),
                                     DL, VT, Src),
                  0);
     return Op.getNode()->getNumValues() == 1
