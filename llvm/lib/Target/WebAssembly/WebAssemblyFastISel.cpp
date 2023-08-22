@@ -602,9 +602,9 @@ unsigned WebAssemblyFastISel::fastMaterializeAlloca(const AllocaInst *AI) {
   if (SI != FuncInfo.StaticAllocaMap.end()) {
     Register ResultReg =
         createResultReg(Subtarget->hasAddr64() ? &WebAssembly::I64RegClass
-                                               : &WebAssembly::I32RegClass);
+                                               : &WebAssembly::MEMREFRegClass);
     unsigned Opc =
-        Subtarget->hasAddr64() ? WebAssembly::COPY_I64 : WebAssembly::COPY_I32;
+        Subtarget->hasAddr64() ? WebAssembly::COPY_I64 : WebAssembly::COPY_MEMREF;
     BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc, TII.get(Opc), ResultReg)
         .addFrameIndex(SI->second);
     return ResultReg;
@@ -624,7 +624,7 @@ unsigned WebAssemblyFastISel::fastMaterializeConstant(const Constant *C) {
                                                : &WebAssembly::I32RegClass);
     unsigned Opc = Subtarget->hasAddr64() ? WebAssembly::CONST_I64
                                           : WebAssembly::CONST_I32;
-    if (GV->getValueType()->isFunctionTy()) {
+    if (GV->getValueType()->isFunctionTy() || Subtarget->hasAddr64()) {
       BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc, TII.get(Opc), ResultReg)
           .addGlobalAddress(GV);
     } else {
@@ -837,6 +837,7 @@ bool WebAssemblyFastISel::selectCall(const Instruction *I) {
   SmallVector<unsigned, 8> Args;
   for (unsigned I = 0, E = Call->arg_size(); I < E; ++I) {
     Value *V = Call->getArgOperand(I);
+    if (isa<ConstantPointerNull>(V)) return false;
     MVT::SimpleValueType ArgTy = getSimpleType(V->getType());
     if (ArgTy == MVT::INVALID_SIMPLE_VALUE_TYPE)
       return false;
