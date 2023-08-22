@@ -1143,7 +1143,8 @@ WebAssemblyTargetLowering::LowerCall(CallLoweringInfo &CLI,
     if (!Chains.empty())
       Chain = DAG.getNode(ISD::TokenFactor, DL, MVT::Other, Chains);
   } else if (IsVarArg) {
-    FINode = DAG.getIntPtrConstant(0, DL);
+//    FINode = DAG.getIntPtrConstant(0, DL);
+    FINode = DAG.getNode(ISD::WASM_MEMREF_NULL, DL, PtrVT);
   }
 
   if (Callee->getOpcode() == ISD::GlobalAddress) {
