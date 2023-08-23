@@ -632,6 +632,12 @@ unsigned WebAssemblyFastISel::fastMaterializeConstant(const Constant *C) {
     }
     return ResultReg;
   }
+  if (isa<ConstantPointerNull>(C)) {
+    if (!Subtarget->hasMemRef()) return 0;
+    Register ResultReg = createResultReg(&WebAssembly::MEMREFRegClass);
+    BuildMI(*FuncInfo.MBB, FuncInfo.InsertPt, DbgLoc, TII.get(WebAssembly::MEMREF_NULL), ResultReg);
+    return ResultReg;
+  }
 
   // Let target-independent code handle it.
   return 0;
