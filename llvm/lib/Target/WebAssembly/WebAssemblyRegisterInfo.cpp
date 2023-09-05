@@ -76,30 +76,40 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
   if(MI.getMF()->getTarget().hasWasmMemref()) {
     auto & frameIdx2Reg = MF.getFrameInfo().FrameIdx2Reg;
     if(!frameIdx2Reg.count(FrameIndex)) {
+      // we insert alloc instruction after sp define instruction in entry block
+      assert(MRI.hasOneDef(FrameRegister) && "SP should has only one def");
+      MachineInstr* SpDefInstr = MRI.getOneDef(FrameRegister)->getParent();
+      MachineBasicBlock* InsertBB = SpDefInstr->getParent();
+      assert(&*MF.begin() == InsertBB && "SP should in entry block");
+      MachineBasicBlock::iterator InsertIt = SpDefInstr;
+      ++InsertIt;
+      // the last instruction should be br or others
+      assert(InsertIt != InsertBB->end() && "there should be at least one instruction after sp def instruction");
+
       Register FrameOffReg = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register FrameAddr = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register BaseVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register SizeVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register AttrVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register FrameObjMemRef = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
-      BuildMI(MBB, *II, II->getDebugLoc(),
+      BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::CONST_I32), FrameOffReg)
           .addImm(FrameOffset);
-      BuildMI(MBB, *II, II->getDebugLoc(),
+      BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::MEMREF_FIELD), FrameAddr)
           .addImm(0) // <addr, base, size, attr>, addr->0
           .addReg(FrameRegister);
-      BuildMI(MBB, *II, II->getDebugLoc(),
+      BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::ADD_I32), BaseVal)
           .addReg(FrameAddr)
           .addReg(FrameOffReg);
-      BuildMI(MBB, *II, II->getDebugLoc(),
+      BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::CONST_I32), SizeVal)
           .addImm(MFI.getObjectSize(FrameIndex));
-      BuildMI(MBB, *II, II->getDebugLoc(),
+      BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::CONST_I32), AttrVal)
           .addImm(0);
-      BuildMI(MBB, *II, II->getDebugLoc(),
+      BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::MEMREF_ALLOC), FrameObjMemRef)
           .addReg(BaseVal)
           .addReg(SizeVal)
