@@ -126,7 +126,9 @@ unsigned WebAssemblyWasmObjectWriter::getRelocType(
       return wasm::R_WASM_TABLE_INDEX_I32;
     }
     if (SymA.isGlobal())
-      return wasm::R_WASM_GLOBAL_INDEX_I32;
+      return IsLocRel ? wasm::R_WASM_MEMORY_ADDR_LOCREL_I32
+                      : wasm::R_WASM_MEMORY_ADDR_I32;
+    //wasm::R_WASM_GLOBAL_INDEX_I32;
     if (auto Section = static_cast<const MCSectionWasm *>(
             getTargetSection(Fixup.getValue()))) {
       if (Section->getKind().isText())

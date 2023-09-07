@@ -1385,7 +1385,7 @@ bool WasmObjectFile::isValidTagSymbol(uint32_t Index) const {
 }
 
 bool WasmObjectFile::isValidDataSymbol(uint32_t Index) const {
-  return Index < Symbols.size() && Symbols[Index].isTypeData();
+  return Index < Symbols.size() && (Symbols[Index].isTypeData() || Symbols[Index].isTypeGlobal());
 }
 
 bool WasmObjectFile::isValidSectionSymbol(uint32_t Index) const {
