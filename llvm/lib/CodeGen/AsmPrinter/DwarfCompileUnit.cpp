@@ -494,7 +494,7 @@ DIE &DwarfCompileUnit::updateSubprogramScopeDIE(const DISubprogram *SP) {
             uint8_t(Asm->getSubtargetInfo().getTargetTriple().getArch() ==
                             Triple::wasm64
                         ? wasm::WASM_TYPE_I64
-                        : wasm::WASM_TYPE_I32),
+                        : wasm::WASM_TYPE_MEMREF/*wasm::WASM_TYPE_I32*/),
             true});
         DIELoc *Loc = new (DIEValueAllocator) DIELoc;
         addUInt(*Loc, dwarf::DW_FORM_data1, dwarf::DW_OP_WASM_location);

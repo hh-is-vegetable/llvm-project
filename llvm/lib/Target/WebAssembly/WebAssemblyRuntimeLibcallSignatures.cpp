@@ -526,7 +526,7 @@ void llvm::getLibcallSignature(const WebAssemblySubtarget &Subtarget,
   assert(Params.empty());
 
   wasm::ValType PtrTy =
-      Subtarget.hasAddr64() ? wasm::ValType::I64 : wasm::ValType::MEMREF;//wasm::ValType::I32;
+      Subtarget.hasAddr64() ? wasm::ValType::I64 : Subtarget.hasMemRef() ? wasm::ValType::MEMREF : wasm::ValType::I32;
 
   auto &Table = RuntimeLibcallSignatures->Table;
   switch (Table[LC]) {
