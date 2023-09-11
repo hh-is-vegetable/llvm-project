@@ -345,7 +345,19 @@ void Writer::layoutMemory() {
   }
   out.memorySec->numMemoryPages =
       alignTo(memoryPtr, WasmPageSize) / WasmPageSize;
+
+  memoryPtr = alignTo(memoryPtr, WasmPageSize);
+
+  out.memorySec->numMemoryPages = memoryPtr / WasmPageSize;
   log("mem: total pages = " + Twine(out.memorySec->numMemoryPages));
+
+  if (WasmSym::heapEnd) {
+    // Set `__heap_end` to follow the end of the statically allocated linear
+    // memory. The fact that this comes last means that a malloc/brk
+    // implementation can grow the heap at runtime.
+    log("mem: heap end    = " + Twine(memoryPtr));
+    WasmSym::heapEnd->setVA(memoryPtr);
+  }
 
   if (config->maxMemory != 0) {
     if (config->maxMemory != alignTo(config->maxMemory, WasmPageSize))
