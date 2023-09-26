@@ -3244,8 +3244,8 @@ void SelectionDAGBuilder::visitICmp(const User &I) {
   EVT DestVT = DAG.getTargetLoweringInfo().getValueType(DAG.getDataLayout(),
                                                         I.getType());
 
-  if(Op1.getValueType().isMemref()) {
-    assert(Op2.getValueType().isMemref() && "Op2 type should be memref");
+  if(Op1.getValueType().isMemref() || Op2.getValueType().isMemref()) {
+    assert(Op2.getValueType().isMemref() && Op1.getValueType().isMemref() && "Op1 and Op2 type should be memref");
     if(!ICmpInst::isEquality(predicate)) {
       EVT PtrIntVT = Op1.getValueType().changeTypeToInteger();
       Op1 = DAG.getNode(ISD::WASM_MEMREF_FIELD, getCurSDLoc(), PtrIntVT,

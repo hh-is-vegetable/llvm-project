@@ -487,6 +487,7 @@ std::string SDNode::getOperationName(const SelectionDAG *G) const {
   case ISD::WASM_MEMREF_FIELD:               return "memref_field";
   case ISD::WASM_MEMREF_AND:                 return "memref_and";
   case ISD::WASM_MEMREF_ALLOC:               return "memref_alloc";
+  case ISD::WASM_MEMREF_FREE:                return "memref_free";
 //  case ISD::WASM_MEMREF_EQUAL:               return "memref_equal";
   case ISD::WASM_MEMREF_NULL:                return "memref_null";
 //  case ISD::PTRTOINT:                        return "ptrtoint";

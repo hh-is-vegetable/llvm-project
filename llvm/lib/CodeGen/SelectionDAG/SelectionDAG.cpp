@@ -515,7 +515,7 @@ static ISD::CondCode getSetCCInverseImpl(ISD::CondCode Op, bool isIntegerLike) {
 }
 
 ISD::CondCode ISD::getSetCCInverse(ISD::CondCode Op, EVT Type) {
-  return getSetCCInverseImpl(Op, Type.isInteger());
+  return getSetCCInverseImpl(Op, Type.isInteger() || Type.isMemref());
 }
 
 ISD::CondCode ISD::GlobalISel::getSetCCInverse(ISD::CondCode Op,

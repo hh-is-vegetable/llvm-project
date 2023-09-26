@@ -107,6 +107,12 @@ WebAssemblyTargetLowering::WebAssemblyTargetLowering(
   }
   setOperationAction(ISD::BRIND, MVT::Other, Custom);
 
+  // cmp for memref
+  for (auto CC : {ISD::SETEQ, ISD::SETNE, ISD::SETLT, ISD::SETLE, ISD::SETGT,
+                  ISD::SETGE, ISD::SETULT, ISD::SETULE, ISD::SETUGT, ISD::SETUGE}) {
+    setCondCodeAction(CC, MVT::memref, Custom);
+  }
+
   // Take the default expansion for va_arg, va_copy, and va_end. There is no
   // default action for va_start, so we do that custom.
   setOperationAction(ISD::VASTART, MVT::Other, Custom);
@@ -2345,6 +2351,15 @@ WebAssemblyTargetLowering::LowerVECTOR_SHUFFLE(SDValue Op,
 SDValue WebAssemblyTargetLowering::LowerSETCC(SDValue Op,
                                               SelectionDAG &DAG) const {
   SDLoc DL(Op);
+  if (Op.getOperand(0).getSimpleValueType().isMemref()) {
+    SDValue ZeroConst = DAG.getConstant(0, DL, MVT::i32);
+    return DAG.getNode(Op.getOpcode(), DL, Op.getValueType(),
+                       DAG.getNode(ISD::WASM_MEMREF_FIELD, DL,
+                                   Op.getOperand(0).getValueType().changeTypeToInteger(), ZeroConst),
+                       DAG.getNode(ISD::WASM_MEMREF_FIELD, DL,
+                                   Op.getOperand(1).getValueType().changeTypeToInteger(), ZeroConst),
+                       Op.getOperand(2)/*CC*/);
+  }
   // The legalizer does not know how to expand the unsupported comparison modes
   // of i64x2 vectors, so we manually unroll them here.
   assert(Op->getOperand(0)->getSimpleValueType(0) == MVT::v2i64);
