@@ -8052,6 +8052,7 @@ bool SLPVectorizerPass::runImpl(Function &F, ScalarEvolution *SE_,
                                 OptimizationRemarkEmitter *ORE_) {
   if (!RunSLPVectorization)
     return false;
+  return false;
   SE = SE_;
   TTI = TTI_;
   TLI = TLI_;
