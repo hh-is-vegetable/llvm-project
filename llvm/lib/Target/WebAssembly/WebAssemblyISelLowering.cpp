@@ -2355,9 +2355,11 @@ SDValue WebAssemblyTargetLowering::LowerSETCC(SDValue Op,
     SDValue ZeroConst = DAG.getConstant(0, DL, MVT::i32);
     return DAG.getNode(Op.getOpcode(), DL, Op.getValueType(),
                        DAG.getNode(ISD::WASM_MEMREF_FIELD, DL,
-                                   Op.getOperand(0).getValueType().changeTypeToInteger(), ZeroConst),
+                                   Op.getOperand(0).getValueType().changeTypeToInteger(), ZeroConst,
+                                   Op.getOperand(0)),
                        DAG.getNode(ISD::WASM_MEMREF_FIELD, DL,
-                                   Op.getOperand(1).getValueType().changeTypeToInteger(), ZeroConst),
+                                   Op.getOperand(1).getValueType().changeTypeToInteger(), ZeroConst,
+                                   Op.getOperand(1)),
                        Op.getOperand(2)/*CC*/);
   }
   // The legalizer does not know how to expand the unsupported comparison modes
