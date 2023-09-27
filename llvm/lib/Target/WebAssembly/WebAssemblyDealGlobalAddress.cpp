@@ -124,8 +124,9 @@ bool WebAssemblyDealGlobalAddress::runOnMachineFunction(MachineFunction &MF) {
         Changed = true;
         if (MI.getOpcode() == WebAssembly::GLOBAL_GET_Addr) {
           Register ToBeReplacedReg = MI.getOperand(0).getReg();
-          for (MachineOperand &MO : MRI.use_operands(ToBeReplacedReg)) {
-            MO.setReg(GlobalGetResReg);
+          for (auto USE_MO = MRI.use_begin(ToBeReplacedReg); USE_MO != MRI.use_end();) {
+            auto MO = USE_MO++;
+            MO->setReg(GlobalGetResReg);
           }
           MI.eraseFromParent();
           break;
