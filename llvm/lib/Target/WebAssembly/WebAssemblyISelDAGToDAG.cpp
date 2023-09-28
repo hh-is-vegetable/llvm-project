@@ -251,7 +251,7 @@ void WebAssemblyDAGToDAGISel::Select(SDNode *Node) {
       SDValue CallTarget = Node->getOperand(1).getOperand(0);
       if (CallTarget.getOpcode() == ISD::TargetGlobalAddress) {
         const GlobalValue* GV = cast<GlobalAddressSDNode>(CallTarget)->getGlobal();
-        if (GV->getName() == "malloc")IsMalloc = true;
+        if (GV->getName() == "dlmalloc")IsMalloc = true;
       }
     }
     // Add the chain last
