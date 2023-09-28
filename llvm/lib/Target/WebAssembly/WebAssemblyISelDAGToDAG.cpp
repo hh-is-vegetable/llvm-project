@@ -246,6 +246,14 @@ void WebAssemblyDAGToDAGISel::Select(SDNode *Node) {
       Ops.push_back(Op);
     }
 
+    bool IsMalloc = false;
+    if (Node->getNumOperands() > 1 && Node->getOperand(1).getNumOperands() > 0) {
+      SDValue CallTarget = Node->getOperand(1).getOperand(0);
+      if (CallTarget.getOpcode() == ISD::TargetGlobalAddress) {
+        const GlobalValue* GV = cast<GlobalAddressSDNode>(CallTarget)->getGlobal();
+        if (GV->getName() == "malloc")IsMalloc = true;
+      }
+    }
     // Add the chain last
     Ops.push_back(Node->getOperand(0));
     MachineSDNode *CallParams =
@@ -258,6 +266,22 @@ void WebAssemblyDAGToDAGISel::Select(SDNode *Node) {
     SDValue Link(CallParams, 0);
     MachineSDNode *CallResults =
         CurDAG->getMachineNode(Results, DL, Node->getVTList(), Link);
+    if (IsMalloc) {
+      SDValue AfterAlloc(CallResults, 0); // result of CallResults MachineSDNode
+      SDValue AllocSize = Ops[1];
+      MachineSDNode* BaseNode = CurDAG->getMachineNode(WebAssembly::MEMREF_FIELD, DL, MVT::i32,
+                                                      CurDAG->getConstant(0, DL, MVT::i32, true, false),
+                                                      AfterAlloc);
+      SDValue AllocBase(BaseNode, 0);
+      MachineSDNode* AllocNode = CurDAG->getMachineNode(WebAssembly::MEMREF_ALLOC, DL, MVT::memref,
+                                                        AllocBase, AllocSize, CurDAG->getConstant(0, DL, MVT::i32, true, false));
+      // malloc result could be null
+      MachineSDNode* AllocNull = CurDAG->getMachineNode(WebAssembly::MEMREF_NULL, DL, MVT::memref);
+      SDValue BaseVal(AllocNode, 0), NullVal(AllocNull, 0);
+      SmallVector<SDValue, 16> AllocOps = {AllocBase, BaseVal, NullVal};
+      MachineSDNode* Result = CurDAG->getMachineNode(WebAssembly::SELECT_MEMREF, DL, Node->getVTList(), AllocOps);
+      CallResults = Result;
+    }
     ReplaceNode(Node, CallResults);
     return;
   }
