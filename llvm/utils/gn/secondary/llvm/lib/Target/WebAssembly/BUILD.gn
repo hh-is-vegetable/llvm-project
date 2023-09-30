@@ -38,6 +38,8 @@ static_library("LLVMWebAssemblyCodeGen") {
     "WebAssemblyCFGStackify.cpp",
     "WebAssemblyChangePrivateGlobal.cpp",
     "WebAssemblyDealGlobalAddress.cpp",
+    "WebAssemblyAfterCallMalloc.cpp",
+    "WebAssemblyInsertInsForFree.cpp",
     "WebAssemblyDebugFixup.cpp",
     "WebAssemblyDebugValueManager.cpp",
     "WebAssemblyExceptionInfo.cpp",

@@ -63,6 +63,8 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeWebAssemblyTarget() {
   initializeWebAssemblyArgumentMovePass(PR);
   initializeWebAssemblySetP2AlignOperandsPass(PR);
   initializeWebAssemblyDealGlobalAddressPass(PR);
+  initializeWebAssemblyAfterCallMallocPass(PR);
+  initializeWebAssemblyInsertInsForFreePass(PR);
   initializeWebAssemblyReplacePhysRegsPass(PR);
   initializeWebAssemblyPrepareForLiveIntervalsPass(PR);
   initializeWebAssemblyOptimizeLiveIntervalsPass(PR);
@@ -480,6 +482,12 @@ bool WebAssemblyPassConfig::addInstSelector() {
 
   // Insert global.get
   addPass(createWebAssemblyDealGlobalAddress());
+
+  // Insert memref.alloc
+  addPass(createWebAssemblyAfterCallMalloc());
+
+  // Insert Instructions for call free
+  addPass(createWebAssemblyInsertInsForFree());
 
   return false;
 }

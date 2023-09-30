@@ -39,6 +39,8 @@ FunctionPass *createWebAssemblyISelDag(WebAssemblyTargetMachine &TM,
 FunctionPass *createWebAssemblyArgumentMove();
 FunctionPass *createWebAssemblySetP2AlignOperands();
 FunctionPass *createWebAssemblyDealGlobalAddress();
+FunctionPass *createWebAssemblyAfterCallMalloc();
+FunctionPass *createWebAssemblyInsertInsForFree();
 
 // Late passes.
 FunctionPass *createWebAssemblyReplacePhysRegs();
@@ -70,6 +72,8 @@ void initializeOptimizeReturnedPass(PassRegistry &);
 void initializeWebAssemblyArgumentMovePass(PassRegistry &);
 void initializeWebAssemblySetP2AlignOperandsPass(PassRegistry &);
 void initializeWebAssemblyDealGlobalAddressPass(PassRegistry &);
+void initializeWebAssemblyAfterCallMallocPass(PassRegistry &);
+void initializeWebAssemblyInsertInsForFreePass(PassRegistry &);
 void initializeWebAssemblyReplacePhysRegsPass(PassRegistry &);
 void initializeWebAssemblyNullifyDebugValueListsPass(PassRegistry &);
 void initializeWebAssemblyPrepareForLiveIntervalsPass(PassRegistry &);
