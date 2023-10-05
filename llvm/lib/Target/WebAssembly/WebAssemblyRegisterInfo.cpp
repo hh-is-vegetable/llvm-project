@@ -88,21 +88,26 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
 
       Register FrameOffReg = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register FrameAddr = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
-      Register BaseVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
+      Register BaseVal;
       Register SizeVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register AttrVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register FrameObjMemRef = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
       BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
-              TII->get(WebAssembly::CONST_I32), FrameOffReg)
-          .addImm(FrameOffset);
-      BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::MEMREF_FIELD), FrameAddr)
           .addImm(0) // <addr, base, size, attr>, addr->0
-          .addReg(FrameRegister);
-      BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
-              TII->get(WebAssembly::ADD_I32), BaseVal)
-          .addReg(FrameAddr)
-          .addReg(FrameOffReg);
+          .addReg(FrameRegister); // %FrameAddr = memref.field 0, %FrameRegister
+      if (FrameOffset != 0) {
+        BaseVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
+        BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
+                TII->get(WebAssembly::CONST_I32), FrameOffReg)
+            .addImm(FrameOffset); // %FrameOffReg = i32.const FrameOffset
+        BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
+                TII->get(WebAssembly::ADD_I32), BaseVal)
+            .addReg(FrameAddr)
+            .addReg(FrameOffReg); // %BaseVal = i32.add %FrameAddr, %FrameOffReg
+      } else {
+        BaseVal = FrameAddr;
+      }
       BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::CONST_I32), SizeVal)
           .addImm(MFI.getObjectSize(FrameIndex));
