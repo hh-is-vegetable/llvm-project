@@ -574,6 +574,18 @@ createUndefinedGlobal(StringRef name, llvm::wasm::WasmGlobalType *type) {
   return sym;
 }
 
+static UndefinedFunction *
+    createUndefinedFunction(StringRef name, StringRef importModule, StringRef importName,
+                        WasmSignature *sig) {
+  auto *sym = cast<UndefinedFunction>(symtab->addUndefinedFunction(
+      name, importModule, importName, WASM_SYMBOL_UNDEFINED, nullptr, sig, true
+      ));
+  config->allowUndefinedSymbols.insert(sym->getName());
+  sym->isUsedInRegularObj = true;
+  sym->markLive();
+  return sym;
+}
+
 static InputGlobal *createGlobal(StringRef name, bool isMutable) {
   llvm::wasm::WasmGlobal wasmGlobal;
   bool is64 = config->is64.getValueOr(false);
@@ -597,6 +609,15 @@ static GlobalSymbol *createOptionalGlobal(StringRef name, bool isMutable) {
 static void createSyntheticSymbols() {
   if (config->relocatable)
     return;
+
+  static WasmSignature i64ArgSignaturei32 = {{ValType::I64}, {ValType::I32}};
+  createUndefinedFunction(
+        "__imported_host_get_value", StringRef("__get_value"), StringRef("__host"), &i64ArgSignaturei32
+      );
+  static WasmSignature i32i64ArgSignature = {{}, {ValType::I32, ValType::I64}};
+  createUndefinedFunction(
+      "__imported_host_set_value", StringRef("__set_value"), StringRef("__host"), &i32i64ArgSignature
+      );
 
   static WasmSignature nullSignature = {{}, {}};
   static WasmSignature i32ArgSignature = {{}, {ValType::I32}};
