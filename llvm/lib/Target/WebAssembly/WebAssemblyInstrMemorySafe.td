@@ -399,11 +399,14 @@ defm MEMREF_AND : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$val), (outs), (i
                 "memref.and\t$res, $mref, $val",
                 "memref.and\t", 0xdc>;
 
-defm MEMREF_ALLOC : I<(outs MEMREF:$res), (ins I32:$addr, I32:$size, I32:$attr),
-                  (outs), (ins),
-                  [(set MEMREF:$res, (mrefalloc I32:$addr, I32:$size, I32:$attr))],
-                  "memref.alloc\t$res, $addr, $size, $attr",
-                  "memref.alloc\t", 0xdd>;
+defm MEMREF_ALLOC : I<(outs MEMREF:$res), (ins i32imm_op:$attr, I32:$addr, I32:$size),
+                  (outs), (ins i32imm_op:$attr),
+                  [(set MEMREF:$res, (mrefalloc imm_i32:$attr, I32:$addr, I32:$size))],
+                  "memref.alloc\t$res, $attr, $addr, $size",
+                  "memref.alloc $attr\t", 0xdd>;
+def : Pat<(memref (mrefalloc imm_i32_target:$attr, I32:$addr, I32:$size)),
+          (MEMREF_ALLOC imm:$attr, I32:$addr, I32:$size)>,
+      Requires<[IsNotPIC, HasAddr32]>;
 
 defm MEMREF_NARROW : I<(outs MEMREF:$res), (ins i32imm_op:$size, I32:$base, MEMREF:$mref),
                 (outs), (ins i32imm_op:$size),

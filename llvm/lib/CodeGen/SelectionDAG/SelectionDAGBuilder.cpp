@@ -3536,7 +3536,7 @@ void SelectionDAGBuilder::visitIntToPtr(const User &I) {
       N = DAG.getZExtOrTrunc(N, getCurSDLoc(), PtrIntTy);
     }
     setValue(&I, DAG.getNode(ISD::WASM_MEMREF_ALLOC, getCurSDLoc(), DestVT,
-                             N, DAG.getConstant(0, getCurSDLoc(), PtrIntTy), DAG.getConstant(0, getCurSDLoc(), PtrIntTy)));
+                             DAG.getConstant(0, getCurSDLoc(), PtrIntTy)/*attr:invalid metada*/, N, DAG.getConstant(0, getCurSDLoc(), PtrIntTy)));
     return;
   }
   EVT PtrMemVT = TLI.getMemValueType(DAG.getDataLayout(), I.getType());

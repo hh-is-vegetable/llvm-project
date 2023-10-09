@@ -223,7 +223,7 @@ static void setGlobalPtr(DefinedGlobal *g, uint64_t memoryPtr) {
 }
 
 static void setGlobalMemref(DefinedGlobal *g, uint64_t memoryPtr, uint64_t size = 0 , uint64_t attr = 0) {
-  g->global->setMemrefVlaue(memoryPtr, size, attr);
+  g->global->setMemrefVlaue(memoryPtr, size, attr|0x01ULL/*attr:global*/);
 }
 
 // Fix the memory layout of the output binary.  This assigns memory offsets
@@ -872,7 +872,7 @@ void Writer::finalizeGlobalAddress() {
           definedG->global->setMemrefVlaue(
               definedG->getVA(),     // addr
               definedG->getSize(),   // size
-              0                      // TODO:attr means read only or others
+              0x21/*attr:0010 0001 invalid metada,global*/ // TODO:attr means read only or others
           );
           LLVM_DEBUG(dbgs() << "Global name: " << sym->getName() << "; global val: " <<
                      definedG->getVA() << "\n");

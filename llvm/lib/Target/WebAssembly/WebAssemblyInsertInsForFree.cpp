@@ -103,11 +103,11 @@ bool WebAssemblyInsertInsForFree::runOnMachineFunction(MachineFunction &MF) {
       BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_FIELD), AddrIntValReg)
           .addImm(0)
           .addReg(ToBeFreeReg);
-      BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::CONST_I32), ZeroConstReg)
-          .addImm(0);
+      // BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::CONST_I32), ZeroConstReg)
+      //     .addImm(0);
       BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_ALLOC), AllocReg)
+          .addImm(0x02) // attr:0000 0010.TODO:use memref.free
           .addReg(AddrIntValReg)
-          .addReg(ZeroConstReg)
           .addReg(ZeroConstReg);
       MI.getOperand(1).ChangeToRegister(AllocReg, false);
 

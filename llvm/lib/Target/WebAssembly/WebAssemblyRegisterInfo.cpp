@@ -90,7 +90,7 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
       Register FrameAddr = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register BaseVal;
       Register SizeVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
-      Register AttrVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
+      // Register AttrVal = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register FrameObjMemRef = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
       BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::MEMREF_FIELD), FrameAddr)
@@ -111,14 +111,14 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
       BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::CONST_I32), SizeVal)
           .addImm(MFI.getObjectSize(FrameIndex));
-      BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
-              TII->get(WebAssembly::CONST_I32), AttrVal)
-          .addImm(0);
+      // BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
+      //         TII->get(WebAssembly::CONST_I32), AttrVal)
+      //     .addImm(0);
       BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::MEMREF_ALLOC), FrameObjMemRef)
+          .addImm(0x20)
           .addReg(BaseVal)
-          .addReg(SizeVal)
-          .addReg(AttrVal);
+          .addReg(SizeVal);
       frameIdx2Reg[FrameIndex] = FrameObjMemRef;
     }
     MI.getOperand(FIOperandNum).ChangeToRegister(frameIdx2Reg[FrameIndex], /*isDef=*/false);

@@ -590,7 +590,7 @@ static InputGlobal *createGlobal(StringRef name, bool isMutable) {
   llvm::wasm::WasmGlobal wasmGlobal;
   bool is64 = config->is64.getValueOr(false);
   wasmGlobal.Type = {uint8_t(is64 ? WASM_TYPE_I64 : WASM_TYPE_MEMREF), isMutable};
-  wasmGlobal.InitExpr = is64 ? intConst(0, is64) : memrefAlloc(0, 0, 0, is64);
+  wasmGlobal.InitExpr = is64 ? intConst(0, is64) : memrefAlloc(0, 0, 1, is64);
   wasmGlobal.SymbolName = name;
   return make<InputGlobal>(wasmGlobal, nullptr);
 }
@@ -624,9 +624,9 @@ static void createSyntheticSymbols() {
   static WasmSignature i64ArgSignature = {{}, {ValType::I64}};
   static llvm::wasm::WasmGlobalType globalTypeI32 = {WASM_TYPE_I32, false};
   static llvm::wasm::WasmGlobalType globalTypeI64 = {WASM_TYPE_I64, false};
-  static llvm::wasm::WasmGlobalType globalTypeMEMREF = {WASM_TYPE_MEMREF, false};
-  static llvm::wasm::WasmGlobalType mutableGlobalTypeI32 = {WASM_TYPE_I32,
-                                                            true};
+  // static llvm::wasm::WasmGlobalType globalTypeMEMREF = {WASM_TYPE_MEMREF, false};
+  // static llvm::wasm::WasmGlobalType mutableGlobalTypeI32 = {WASM_TYPE_I32,
+  //                                                           true};
   static llvm::wasm::WasmGlobalType mutableGlobalTypeI64 = {WASM_TYPE_I64,
                                                             true};
   static llvm::wasm::WasmGlobalType mutableGlobalTypeMEMREF = {WASM_TYPE_MEMREF,

@@ -104,7 +104,7 @@ bool WebAssemblyAfterCallMalloc::runOnMachineFunction(MachineFunction &MF) {
       Register BaseReg = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register SizeReg = MI.getOperand(1).getReg();
       if (MI.getOperand(1).isKill())MI.getOperand(1).setIsKill(false);
-      Register AttrReg = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
+      // Register AttrReg = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
       Register NullReg = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
       Register AllocReg = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
       Register SelectReg = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
@@ -114,13 +114,13 @@ bool WebAssemblyAfterCallMalloc::runOnMachineFunction(MachineFunction &MF) {
           .addImm(0)
           .addReg(CallResReg);
 
-      BuildMI(*MI.getParent(), InsertPos, MI.getDebugLoc(), TII->get(WebAssembly::CONST_I32), AttrReg)
-          .addImm(0);
+      // BuildMI(*MI.getParent(), InsertPos, MI.getDebugLoc(), TII->get(WebAssembly::CONST_I32), AttrReg)
+      //     .addImm(0);
       BuildMI(*MI.getParent(), InsertPos, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_NULL), NullReg);
       BuildMI(*MI.getParent(), InsertPos, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_ALLOC), AllocReg)
+          .addImm(0x22) //attr:0010 0010 valid metada, heap
           .addReg(BaseReg)
-          .addReg(SizeReg)
-          .addReg(AttrReg);
+          .addReg(SizeReg);
       BuildMI(*MI.getParent(), InsertPos, MI.getDebugLoc(), TII->get(WebAssembly::SELECT_MEMREF), SelectReg)
           .addReg(AllocReg)
           .addReg(NullReg)
