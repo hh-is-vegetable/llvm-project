@@ -39,7 +39,7 @@ def SDTMrefFree : SDTypeProfile<0, 1, [
 
 def SDTMrefNarrow : SDTypeProfile<1, 3, [
   SDTCisVT<0, memref>,
-  SDTCisVT<1, memref>, SDTCisInt<2>, SDTCisInt<3>
+  SDTCisInt<1>, SDTCisInt<2>, SDTCisVT<3, memref>
 ]>;
 
 def SDTMrefField : SDTypeProfile<1, 2, [
@@ -405,14 +405,20 @@ defm MEMREF_ALLOC : I<(outs MEMREF:$res), (ins I32:$addr, I32:$size, I32:$attr),
                   "memref.alloc\t$res, $addr, $size, $attr",
                   "memref.alloc\t", 0xdd>;
 
-defm MEMREF_NARROW : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$base, I32:$size), 
-                (outs), (ins),
-                [(set MEMREF:$res, (mrefnarrow MEMREF:$mref, I32:$base, I32:$size))],
-                "memref.narrow\t$res, $mref, $base, $size",
-                "memref.narrow\t", 0xde>;
+defm MEMREF_NARROW : I<(outs MEMREF:$res), (ins i32imm_op:$size, I32:$base, MEMREF:$mref),
+                (outs), (ins i32imm_op:$size),
+                [],
+                "memref.narrow\t$res, $size, $base, $mref",
+                "memref.narrow\t$size", 0xde>;
 
-def : Pat<(memref (mrefnarrow (WebAssemblyWrapper_Memref tglobaladdr:$mref), I32:$base, I32:$size)),
-          (MEMREF_NARROW tglobaladdr:$mref, I32:$base, I32:$size)>,
+def : Pat<(memref (mrefnarrow imm_i32:$size, I32:$base, (WebAssemblyWrapper_Memref tglobaladdr:$mref))),
+          (MEMREF_NARROW imm:$size, I32:$base, tglobaladdr:$mref)>,
+      Requires<[IsNotPIC, HasAddr32]>;
+def : Pat<(memref (mrefnarrow imm_i32_target:$size, I32:$base, (WebAssemblyWrapper_Memref tglobaladdr:$mref))),
+          (MEMREF_NARROW imm:$size, I32:$base, tglobaladdr:$mref)>,
+      Requires<[IsNotPIC, HasAddr32]>;
+def : Pat<(memref (mrefnarrow imm_i32:$size, I32:$base, MEMREF:$mref)),
+          (MEMREF_NARROW imm:$size, I32:$base, MEMREF:$mref)>,
       Requires<[IsNotPIC, HasAddr32]>;
 
 defm MEMREF_FIELD : I<(outs I32:$res), (ins i32imm_op:$idx, MEMREF:$mref),

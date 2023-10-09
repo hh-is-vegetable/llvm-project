@@ -3934,9 +3934,9 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
   }
 
   auto hasWasmMemref = TM.hasWasmMemref() && N.getValueType().isMemref();
-  bool isNarrow = false;
+  bool isNarrow = false; // if we should do narrow
   SDValue NarrowBase;
-  SDValue NarrowSize;
+  int64_t NarrowNewSize = 0; // only structure can produce narrow, and in specific field, the size can be known
   for (gep_type_iterator GTI = gep_type_begin(&I), E = gep_type_end(&I);
        GTI != E; ++GTI) { // This loop is to get the real address = N + Offset
     const Value *Idx = GTI.getOperand();
@@ -3967,12 +3967,8 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
         NarrowBase = DAG.getNode(ISD::WASM_MEMREF_FIELD, dl, PtrIntegerTy, DAG.getConstant(0, dl, PtrIntegerTy), N);
         Type* FieldTy = StTy->getElementType(Field);
         TypeSize FieldSize = DAG.getDataLayout().getTypeStoreSize(FieldTy);
-        if(FieldSize.isScalable()) {
-          NarrowSize = DAG.getVScale(dl, PtrIntegerTy, APInt(PtrIntegerTy.getScalarSizeInBits(),
-                               FieldSize.getKnownMinValue()));
-        } else {
-          NarrowSize = DAG.getConstant(FieldSize.getFixedValue(), dl, PtrIntegerTy);
-        }
+        assert(!FieldSize.isScalable() && "for webassembly, we do not support scalable now");
+        NarrowNewSize = FieldSize.getFixedValue();
       }
     } else {
       // IdxSize is the width of the arithmetic according to IR semantics.
@@ -4073,7 +4069,10 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
   }
 
   if(isNarrow) {
-    N = DAG.getNode(ISD::WASM_MEMREF_NARROW, dl, N.getValueType(), N, NarrowBase, NarrowSize);
+    N = DAG.getNode(ISD::WASM_MEMREF_NARROW, dl, N.getValueType(),
+                    DAG.getConstant(NarrowNewSize, dl, N.getValueType().changeTypeToInteger()),
+                    NarrowBase,
+                    N);
   }
   MVT PtrTy = TLI.getPointerTy(DAG.getDataLayout(), AS);
   MVT PtrMemTy = TLI.getPointerMemTy(DAG.getDataLayout(), AS);
