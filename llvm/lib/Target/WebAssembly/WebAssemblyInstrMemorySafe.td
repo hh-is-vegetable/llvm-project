@@ -401,10 +401,13 @@ defm MEMREF_AND : I<(outs MEMREF:$res), (ins MEMREF:$mref, I32:$val), (outs), (i
 
 defm MEMREF_ALLOC : I<(outs MEMREF:$res), (ins i32imm_op:$attr, I32:$addr, I32:$size),
                   (outs), (ins i32imm_op:$attr),
-                  [(set MEMREF:$res, (mrefalloc imm_i32:$attr, I32:$addr, I32:$size))],
+                  [],
                   "memref.alloc\t$res, $attr, $addr, $size",
                   "memref.alloc $attr\t", 0xdd>;
 def : Pat<(memref (mrefalloc imm_i32_target:$attr, I32:$addr, I32:$size)),
+          (MEMREF_ALLOC imm:$attr, I32:$addr, I32:$size)>,
+      Requires<[IsNotPIC, HasAddr32]>;
+def : Pat<(memref (mrefalloc imm_i32:$attr, I32:$addr, I32:$size)),
           (MEMREF_ALLOC imm:$attr, I32:$addr, I32:$size)>,
       Requires<[IsNotPIC, HasAddr32]>;
 
