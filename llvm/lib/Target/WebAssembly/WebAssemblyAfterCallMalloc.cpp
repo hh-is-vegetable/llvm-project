@@ -67,6 +67,7 @@ bool WebAssemblyAfterCallMalloc::runOnMachineFunction(MachineFunction &MF) {
                     << MF.getName() << '\n');
 
   bool Changed = false;
+  if (MF.getName() != "malloc" || MF.getName() != "calloc")return Changed;
 
   MachineRegisterInfo &MRI = MF.getRegInfo();
   const auto *TII = MF.getSubtarget<WebAssemblySubtarget>().getInstrInfo();
