@@ -1256,7 +1256,7 @@ enum NodeType {
   WASM_MEMREF_AND,
   // WASM_MEMREF_ALLOC - alloc memory and return type is memref
   WASM_MEMREF_ALLOC,
-  WASM_MEMREF_FREE,
+  // WASM_MEMREF_FREE,
   WASM_MEMREF_NULL,
 //  WASM_MEMREF_EQUAL,
 

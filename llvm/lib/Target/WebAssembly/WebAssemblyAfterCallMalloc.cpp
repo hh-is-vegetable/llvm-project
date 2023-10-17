@@ -84,7 +84,7 @@ bool WebAssemblyAfterCallMalloc::runOnMachineFunction(MachineFunction &MF) {
         if (!MI.getOperand(Idx).isGlobal() || !MI.getOperand(Idx).getGlobal()->getValueType()->isFunctionTy())continue;
         MachineOperand& MO = MI.getOperand(Idx);
         GV = MO.getGlobal();
-        if (GV->getName() == "malloc") {
+        if (GV->getName() == "dlmalloc") {
           IsMalloc = true;
           break;
         }

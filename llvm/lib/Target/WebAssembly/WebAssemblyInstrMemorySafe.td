@@ -33,9 +33,9 @@ def SDTMrefAlloc : SDTypeProfile<1, 3, [
   SDTCisInt<1>, SDTCisInt<2>, SDTCisInt<3>
 ]>;
 
-def SDTMrefFree : SDTypeProfile<0, 1, [
-  SDTCisVT<0, memref>
-]>;
+// def SDTMrefFree : SDTypeProfile<0, 1, [
+//   SDTCisVT<0, memref>
+// ]>;
 
 def SDTMrefNarrow : SDTypeProfile<1, 3, [
   SDTCisVT<0, memref>,
@@ -65,7 +65,7 @@ def mrefand : SDNode<"ISD::WASM_MEMREF_AND", SDTMrefBinary, []>;
 
 def mrefalloc : SDNode<"ISD::WASM_MEMREF_ALLOC", SDTMrefAlloc, []>;
 
-def mreffree : SDNode<"ISD::WASM_MEMREF_FREE", SDTMrefFree, []>;
+// def mreffree : SDNode<"ISD::WASM_MEMREF_FREE", SDTMrefFree, []>;
 
 def mrefnarrow : SDNode<"ISD::WASM_MEMREF_NARROW", SDTMrefNarrow, []>;
 
@@ -511,9 +511,8 @@ def : Pat<(select I32:$cond,
 def : Pat<(memref (WebAssemblyWrapper_Memref tglobaladdr:$addr)),
           (GLOBAL_GET_Addr tglobaladdr:$addr)>, Requires<[HasAddr32]>;
 
-defm MEMREF_FREE : I<(outs), (ins MEMREF:$ref),
-                  (outs), (ins), [],
-                  "memref.free\t$ref",
-                  "memref.free\t", 0xc9>;
-// def : Pat<(mreffree MEMREF:$ref),
-//           (MEMREF_FREE MEMREF:$ref)>;
+let mayStore = 1 in
+defm MEMREF_DEALLOC : I<(outs), (ins MEMREF:$ref),
+                    (outs), (ins), [],
+                    "memref.dealloc\t$ref",
+                    "memref.dealloc\t", 0xc9>;
