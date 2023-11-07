@@ -1740,7 +1740,11 @@ void SelectionDAGLegalize::ExpandDYNAMIC_STACKALLOC(SDNode* Node,
     SDValue BaseAddr = DAG.getNode(ISD::WASM_MEMREF_FIELD, dl, VT.changeTypeToInteger(),
                                    DAG.getConstant(0, dl, Size.getValueType()),
                                    Tmp1);
-    Tmp1 = DAG.getNode(ISD::WASM_MEMREF_ALLOC, dl, VT, DAG.getConstant(0x20, dl, Size.getValueType())/*attr:valid metadata,stack*/, BaseAddr, MemAllocSize);
+    const uint32_t HasMetadataFlag = 0x20; // 0010 0000
+    const uint32_t ValidPointerFlag = 0x10; // 0001 0000
+    // const uint32_t HeapVariableFlag = 0x02; // 0000 0010
+    // const uint32_t GlobalVariableFlag = 0x01; // 0000 0001
+    Tmp1 = DAG.getNode(ISD::WASM_MEMREF_ALLOC, dl, VT, DAG.getConstant(HasMetadataFlag | ValidPointerFlag, dl, Size.getValueType())/*attr:valid metadata,stack*/, BaseAddr, MemAllocSize);
   }
 
   Results.push_back(Tmp1);
