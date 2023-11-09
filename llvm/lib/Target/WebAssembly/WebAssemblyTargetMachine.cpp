@@ -65,6 +65,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeWebAssemblyTarget() {
   initializeWebAssemblyDealGlobalAddressPass(PR);
   initializeWebAssemblyAfterCallMallocPass(PR);
   initializeWebAssemblyInsertInsForFreePass(PR);
+  initializeWebAssemblyImmediateMetadataPass(PR);
   initializeWebAssemblyReplacePhysRegsPass(PR);
   initializeWebAssemblyPrepareForLiveIntervalsPass(PR);
   initializeWebAssemblyOptimizeLiveIntervalsPass(PR);
@@ -488,6 +489,9 @@ bool WebAssemblyPassConfig::addInstSelector() {
 
   // Insert Instructions for call free
   addPass(createWebAssemblyInsertInsForFree());
+
+  // add immediate metadata
+  addPass(createWebAssemblyImmediateMetadata());
 
   return false;
 }

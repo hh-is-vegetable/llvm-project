@@ -27,6 +27,7 @@ add_llvm_target(WebAssemblyCodeGen
   WebAssemblyDealGlobalAddress.cpp
   WebAssemblyAfterCallMalloc.cpp
   WebAssemblyInsertInsForFree.cpp
+  WebAssemblyImmediateMetadata.cpp
   WebAssemblyExplicitLocals.cpp
   WebAssemblyFastISel.cpp
   WebAssemblyFixBrTableDefaults.cpp

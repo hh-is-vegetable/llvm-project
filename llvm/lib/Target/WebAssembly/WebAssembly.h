@@ -41,6 +41,7 @@ FunctionPass *createWebAssemblySetP2AlignOperands();
 FunctionPass *createWebAssemblyDealGlobalAddress();
 FunctionPass *createWebAssemblyAfterCallMalloc();
 FunctionPass *createWebAssemblyInsertInsForFree();
+FunctionPass *createWebAssemblyImmediateMetadata();
 
 // Late passes.
 FunctionPass *createWebAssemblyReplacePhysRegs();
@@ -74,6 +75,7 @@ void initializeWebAssemblySetP2AlignOperandsPass(PassRegistry &);
 void initializeWebAssemblyDealGlobalAddressPass(PassRegistry &);
 void initializeWebAssemblyAfterCallMallocPass(PassRegistry &);
 void initializeWebAssemblyInsertInsForFreePass(PassRegistry &);
+void initializeWebAssemblyImmediateMetadataPass(PassRegistry &);
 void initializeWebAssemblyReplacePhysRegsPass(PassRegistry &);
 void initializeWebAssemblyNullifyDebugValueListsPass(PassRegistry &);
 void initializeWebAssemblyPrepareForLiveIntervalsPass(PassRegistry &);
