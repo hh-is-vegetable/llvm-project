@@ -42,6 +42,11 @@ using namespace llvm;
 
 namespace {
 class WebAssemblyImmediateMetadata final : public MachineFunctionPass {
+
+  const uint32_t no_check_flag     = 0x0100;     //0000 0001 0000 0000
+  const uint32_t lower_check_flag  = 0x0200;     //0000 0010 0000 0000
+  const uint32_t upper_check_flag  = 0x0400;     //0000 0100 0000 0000
+
   StringRef getPassName() const override {
     return "WebAssembly Immediate Metadata";
   }
@@ -52,9 +57,73 @@ class WebAssemblyImmediateMetadata final : public MachineFunctionPass {
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
+  void setFlag(MachineInstr& MI, uint32_t flag) {
+    unsigned alignIdx = 0 + (MI.mayLoad() ? 1 : 0);
+    uint64_t oldAlign = MI.getOperand(alignIdx).getImm();
+    MI.getOperand(alignIdx).setImm(oldAlign | flag);
+  }
+
+  void insert2Map(DenseMap<unsigned, SmallVector<MachineInstr*>>&Map, DenseMap<unsigned, MachineInstr*>&Max2Ins,
+                  DenseMap<unsigned, MachineInstr*>& Min2Ins, MachineInstr* MI, unsigned key) {
+    if (!Map.count(key)) {
+      // if not record
+      Map[key].push_back(MI);
+      Max2Ins[key] = MI;
+      Min2Ins[key] = MI;
+      return ; // finished to record this MI
+    }
+    Map[key].push_back(MI);
+    // update RegMaxOffIns and RegMinOffIns
+    unsigned OffMOIdx = 1 + MI->mayLoad();
+    int64_t Off = MI->getOperand(OffMOIdx).getImm();
+    if (Off > Max2Ins[key]->getOperand(1+ Max2Ins[key]->mayLoad()).getImm()) {
+      Max2Ins[key] = MI;
+    }
+    if (Off < Min2Ins[key]->getOperand(1+ Min2Ins[key]->mayLoad()).getImm()) {
+      Min2Ins[key] = MI;
+    }
+  }
+
+  bool changeOff(DenseMap<unsigned, SmallVector<MachineInstr*>>& Map, DenseMap<unsigned, MachineInstr*>& Max2Ins,
+                 DenseMap<unsigned, MachineInstr*>& Min2Ins) {
+//    const uint32_t no_check_flag     = 0x0100;     //0000 0001 0000 0000
+//    const uint32_t lower_check_flag  = 0x0200;     //0000 0010 0000 0000
+//    const uint32_t upper_check_flag  = 0x0400;     //0000 0100 0000 0000
+    bool Changed = false;
+    for (auto& it : Map) {
+      unsigned key = it.first;
+      // if only one use, no need change
+      if (it.second.size() <= 1)
+        continue ;
+      Changed |= true;
+      // if min off == max off, and then RegMaxOffIns[reg] == RegMinOffIns[reg], so only one need check
+      for (MachineInstr* ins : it.second) {
+        unsigned alignIdx = 0 + (ins->mayLoad() ? 1 : 0);
+        uint64_t oldAlign = ins->getOperand(alignIdx).getImm();
+        if (ins == Max2Ins[key]) {
+          if (ins != Min2Ins[key]) // if minOff == maxOff, set NO flag and it will check upper and lower
+            ins->getOperand(alignIdx).setImm(oldAlign | upper_check_flag);
+        } else if (ins == Min2Ins[key]) {
+          ins->getOperand(alignIdx).setImm(oldAlign | lower_check_flag);
+        } else {
+          ins->getOperand(alignIdx).setImm(oldAlign | no_check_flag);
+        }
+      }
+    }
+    return Changed;
+  }
+
   bool isMSLoadOrStore(const MachineInstr &MI, const TargetInstrInfo *TII) {
     StringRef OpName = TII->getName(MI.getOpcode());
-    return OpName.contains("MSLoad") || OpName.contains("MSStore");
+    return OpName.contains("MSLOAD") || OpName.contains("MSSTORE");
+  }
+
+  unsigned getMemAccessSize(const MachineInstr &MI, const TargetInstrInfo *TII) {
+    StringRef OpName = TII->getName(MI.getOpcode());
+    if (OpName.contains("8_"))return 1;
+    else if (OpName.contains("16_"))return 2;
+    else if (OpName.contains("32") || OpName.contains("MEMREF"))return 4;
+    else return 8;
   }
 
   bool runOnMachineFunction(MachineFunction &MF) override;
@@ -84,9 +153,12 @@ bool WebAssemblyImmediateMetadata::runOnMachineFunction(MachineFunction &MF) {
   MachineFrameInfo &MFI = MF.getFrameInfo();
   const auto *TII = MF.getSubtarget<WebAssemblySubtarget>().getInstrInfo();
   for (MachineBasicBlock& MBB : MF) {
-    DenseMap<unsigned, SmallVector<MachineInstr*, 4>> AddrInstrMap; // addr reg->users in this block
-    DenseMap<unsigned, MachineInstr*> MaxOffIns; // reg->max off
-    DenseMap<unsigned, MachineInstr*> MinOffIns; // reg->min off
+    DenseMap<unsigned, SmallVector<MachineInstr*>> RegAddrInstrMap; // addr reg->users in this block
+    DenseMap<unsigned, MachineInstr*> RegMaxOffIns;                 // reg->max off
+    DenseMap<unsigned, MachineInstr*> RegMinOffIns;                 // reg->min off
+    DenseMap<unsigned, SmallVector<MachineInstr*>> FrameAddrInstrMap; // addr reg->users in this block
+    DenseMap<unsigned, MachineInstr*> FrameMaxOffIns;                 // reg->max off
+    DenseMap<unsigned, MachineInstr*> FrameMinOffIns;                 // reg->min off
     for (MachineInstr& MI : MBB) {
       if (!MI.mayLoadOrStore() || !isMSLoadOrStore(MI, TII))
         continue ;
@@ -95,49 +167,26 @@ bool WebAssemblyImmediateMetadata::runOnMachineFunction(MachineFunction &MF) {
       unsigned isLoad = MI.mayLoad() ? 1 : 0;
       // %res = msload align, off, mref
       // msload align, off, mref, val
-      Register AddrReg =  MI.getOperand(2+isLoad).getReg();
-      if (!AddrInstrMap.count(AddrReg)) {
-        // if not record
-        AddrInstrMap[AddrReg].push_back(&MI);
-        MaxOffIns[AddrReg] = &MI;
-        MinOffIns[AddrReg] = &MI;
-        continue ; // finished to record this MI
-      }
-      AddrInstrMap[AddrReg].push_back(&MI);
-      // update MaxOffIns and MinOffIns
-      unsigned OffMOIdx = 1+isLoad;
-      int64_t Off = MI.getOperand(OffMOIdx).getImm();
-      if (Off > MaxOffIns[AddrReg]->getOperand(OffMOIdx).getImm()) {
-        MaxOffIns[AddrReg] = &MI;
-      }
-      if (Off < MinOffIns[AddrReg]->getOperand(OffMOIdx).getImm()) {
-        MinOffIns[AddrReg] = &MI;
+      MachineOperand& MO = MI.getOperand(2+isLoad);
+      assert((MO.isFI() || MO.isReg()) && "after deal global addr, load and store address can only be frame object or reg");
+      if (MO.isReg()) {
+        Register AddrReg =  MO.getReg();
+        insert2Map(RegAddrInstrMap, RegMaxOffIns, RegMinOffIns, &MI, AddrReg);
+      } else {
+        int  FrameIndex =  MO.getIndex();
+        // TODO:static check for frame object
+//        if (MFI.getObjectSize(FrameIndex) == getMemAccessSize(MI, TII)) {
+//          unsigned alignIdx = 0 + (MI.mayLoad() ? 1 : 0);
+//          uint64_t oldAlign = MI.getOperand(alignIdx).getImm();
+//          MI.getOperand(alignIdx).setImm(oldAlign | no_check_flag);
+//        }else
+          insert2Map(FrameAddrInstrMap, FrameMaxOffIns, FrameMinOffIns, &MI, FrameIndex);
       }
     }
-    const uint32_t no_check_flag     = 0x0100;     //0000 0001 0000 0000
-    const uint32_t lower_check_flag  = 0x0200;     //0000 0010 0000 0000
-    const uint32_t upper_check_flag  = 0x0400;     //0000 0100 0000 0000
     // change
-    for (auto& it : AddrInstrMap) {
-      Register reg = it.first;
-      // if only one use, no need change
-      if (it.second.size() <= 1)
-        continue ;
-      Changed |= true;
-      // if min off == max off, and then MaxOffIns[reg] == MinOffIns[reg], so only one need check
-      for (MachineInstr* ins : it.second) {
-        unsigned alignIdx = 0 + (ins->mayLoad() ? 1 : 0);
-        uint64_t oldAlign = ins->getOperand(alignIdx).getImm();
-        if (ins == MaxOffIns[reg]) {
-          if (ins != MinOffIns[reg]) // if minOff == maxOff, set no flag and it will check upper and lower
-            ins->getOperand(alignIdx).setImm(oldAlign | upper_check_flag);
-        } else if (ins == MinOffIns[reg]) {
-          ins->getOperand(alignIdx).setImm(oldAlign | lower_check_flag);
-        } else {
-          ins->getOperand(alignIdx).setImm(oldAlign | no_check_flag);
-        }
-      }
-    }
+    Changed |= changeOff(RegAddrInstrMap, RegMaxOffIns, RegMinOffIns);
+    Changed |= changeOff(FrameAddrInstrMap, FrameMaxOffIns, FrameMinOffIns);
+
   }
   return Changed;
 }
