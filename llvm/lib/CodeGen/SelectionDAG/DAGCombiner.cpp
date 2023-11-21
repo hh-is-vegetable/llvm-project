@@ -512,6 +512,7 @@ namespace {
     SDValue visitFP_TO_FP16(SDNode *N);
     SDValue visitFP16_TO_FP(SDNode *N);
     SDValue visitVECREDUCE(SDNode *N);
+    SDValue visitWASM_MEMREF_ALLOC(SDNode *N);
     SDValue visitVPOp(SDNode *N);
 
     SDValue visitFADDForFMACombine(SDNode *N);
@@ -1738,6 +1739,7 @@ SDValue DAGCombiner::visit(SDNode *N) {
   case ISD::VECREDUCE_UMIN:
   case ISD::VECREDUCE_FMAX:
   case ISD::VECREDUCE_FMIN:     return visitVECREDUCE(N);
+  case ISD::WASM_MEMREF_ALLOC:  return visitWASM_MEMREF_ALLOC(N);
 #define BEGIN_REGISTER_VP_SDNODE(SDOPC, ...) case ISD::SDOPC:
 #include "llvm/IR/VPIntrinsics.def"
     return visitVPOp(N);
@@ -2334,6 +2336,19 @@ SDValue DAGCombiner::visitADDLike(SDNode *N) {
   // fold (add c1, c2) -> c1+c2
   if (SDValue C = DAG.FoldConstantArithmetic(ISD::ADD, DL, VT, {N0, N1}))
     return C;
+
+  if (N0.getOpcode() == ISD::WASM_MEMREF_FIELD) {
+    auto ptrTy = N0.getOperand(1).getValueType();
+    assert(ptrTy.isMemref());
+    SDValue Ptr = DAG.getNode(ISD::WASM_MEMREF_ADD, DL, ptrTy, N0.getOperand(1), N1);
+    return DAG.getNode(ISD::WASM_MEMREF_FIELD, DL, VT, DAG.getConstant(0, DL, VT), Ptr);
+  }
+  if (N1.getOpcode() == ISD::WASM_MEMREF_FIELD) {
+    auto ptrTy = N1.getOperand(1).getValueType();
+    assert(ptrTy.isMemref());
+    SDValue Ptr = DAG.getNode(ISD::WASM_MEMREF_ADD, DL, ptrTy, N1.getOperand(1), N0);
+    return DAG.getNode(ISD::WASM_MEMREF_FIELD, DL, VT, DAG.getConstant(0, DL, VT), Ptr);
+  }
 
   // canonicalize constant to RHS
   if (DAG.isConstantIntBuildVectorOrConstantInt(N0) &&
@@ -3329,6 +3344,14 @@ SDValue DAGCombiner::visitSUB(SDNode *N) {
   // fold (sub c1, c2) -> c3
   if (SDValue C = DAG.FoldConstantArithmetic(ISD::SUB, DL, VT, {N0, N1}))
     return C;
+
+  if (N0.getOpcode() == ISD::WASM_MEMREF_FIELD) {
+    auto ptrTy = N0.getOperand(1).getValueType();
+    assert(ptrTy.isMemref());
+    N1 = DAG.getNode(ISD::SUB, DL, VT, DAG.getConstant(0, DL, VT), N1);
+    SDValue Ptr = DAG.getNode(ISD::WASM_MEMREF_ADD, DL, ptrTy, N0.getOperand(1), N1);
+    return DAG.getNode(ISD::WASM_MEMREF_FIELD, DL, VT, DAG.getConstant(0, DL, VT), Ptr);
+  }
 
   // fold vector ops
   if (VT.isVector()) {
@@ -5899,6 +5922,20 @@ SDValue DAGCombiner::visitAND(SDNode *N) {
   // fold (and c1, c2) -> c1&c2
   if (SDValue C = DAG.FoldConstantArithmetic(ISD::AND, SDLoc(N), VT, {N0, N1}))
     return C;
+
+
+  if (N0.getOpcode() == ISD::WASM_MEMREF_FIELD) {
+    auto ptrTy = N0.getOperand(1).getValueType();
+    assert(ptrTy.isMemref());
+    SDValue Ptr = DAG.getNode(ISD::WASM_MEMREF_AND, SDLoc(N), ptrTy, N0.getOperand(1), N1);
+    return DAG.getNode(ISD::WASM_MEMREF_FIELD, SDLoc(N), VT, DAG.getConstant(0, SDLoc(N), VT), Ptr);
+  }
+  if (N1.getOpcode() == ISD::WASM_MEMREF_FIELD) {
+    auto ptrTy = N1.getOperand(1).getValueType();
+    assert(ptrTy.isMemref());
+    SDValue Ptr = DAG.getNode(ISD::WASM_MEMREF_AND, SDLoc(N), ptrTy, N1.getOperand(1), N0);
+    return DAG.getNode(ISD::WASM_MEMREF_FIELD, SDLoc(N), VT, DAG.getConstant(0, SDLoc(N), VT), Ptr);
+  }
 
   // canonicalize constant to RHS
   if (DAG.isConstantIntBuildVectorOrConstantInt(N0) &&
@@ -22588,6 +22625,13 @@ SDValue DAGCombiner::visitVECREDUCE(SDNode *N) {
       return DAG.getNode(NewOpcode, SDLoc(N), N->getValueType(0), N0);
   }
 
+  return SDValue();
+}
+
+SDValue DAGCombiner::visitWASM_MEMREF_ALLOC(SDNode *N) {
+  if (N->getOperand(1).getOpcode() == ISD::WASM_MEMREF_FIELD) {
+    return N->getOperand(1).getOperand(1);
+  }
   return SDValue();
 }
 
