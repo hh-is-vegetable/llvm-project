@@ -3536,7 +3536,7 @@ void SelectionDAGBuilder::visitIntToPtr(const User &I) {
     if(N.getValueType() != PtrIntTy) {
       N = DAG.getZExtOrTrunc(N, getCurSDLoc(), PtrIntTy);
     }
-    // const uint32_t HasMetadataFlag = 0x20; // 0010 0000
+    const uint32_t HasMetadataFlag = 0x20; // 0010 0000
     // const uint32_t ValidPointerFlag = 0x10; // 0001 0000
     // const uint32_t HeapVariableFlag = 0x02; // 0000 0010
     // const uint32_t GlobalVariableFlag = 0x01; // 0000 0001
@@ -3550,11 +3550,8 @@ void SelectionDAGBuilder::visitIntToPtr(const User &I) {
       setValue(&I, N1);
       return;
     }
-    setValue(&I, DAG.getNode(ISD::WASM_MEMREF_ADD, getCurSDLoc(), DestVT,
-                          N1,
-                          N));
-    // setValue(&I, DAG.getNode(ISD::WASM_MEMREF_ALLOC, getCurSDLoc(), DestVT,
-    //                          DAG.getConstant(0, getCurSDLoc(), PtrIntTy)/*attr:invalid metada*/, N, DAG.getConstant(0, getCurSDLoc(), PtrIntTy)));
+    setValue(&I, DAG.getNode(ISD::WASM_MEMREF_ALLOC, getCurSDLoc(), DestVT,
+                             DAG.getConstant(HasMetadataFlag, getCurSDLoc(), PtrIntTy)/*attr:invalid metada*/, N, DAG.getConstant(0, getCurSDLoc(), PtrIntTy)));
     return;
   }
   EVT PtrMemVT = TLI.getMemValueType(DAG.getDataLayout(), I.getType());

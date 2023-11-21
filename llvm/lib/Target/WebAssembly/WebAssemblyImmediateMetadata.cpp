@@ -164,6 +164,11 @@ bool WebAssemblyImmediateMetadata::runOnMachineFunction(MachineFunction &MF) {
         continue ;
       // only look up address in store/load
       LLVM_DEBUG(dbgs() << "Load Or Store:"; MI.dump());
+      if (MF.getName() == "dlfree" || MF.getName() == "dlmalloc") {
+        setFlag(MI, no_check_flag);
+        Changed = true;
+        continue ;
+      }
       unsigned isLoad = MI.mayLoad() ? 1 : 0;
       // %res = msload align, off, mref
       // msload align, off, mref, val

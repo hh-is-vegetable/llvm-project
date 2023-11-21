@@ -115,12 +115,12 @@ void WebAssemblyRegisterInfo::eliminateFrameIndex(
       //         TII->get(WebAssembly::CONST_I32), AttrVal)
       //     .addImm(0);
       const uint32_t HasMetadataFlag = 0x20; // 0010 0000
-      const uint32_t ValidPointerFlag = 0x10; // 0001 0000
+      // const uint32_t ValidPointerFlag = 0x10; // 0001 0000
       // const uint32_t HeapVariableFlag = 0x02; // 0000 0010
       // const uint32_t GlobalVariableFlag = 0x01; // 0000 0001
       BuildMI(*InsertBB, *InsertIt, InsertIt->getDebugLoc(),
               TII->get(WebAssembly::MEMREF_ALLOC), FrameObjMemRef)
-          .addImm(HasMetadataFlag | ValidPointerFlag)
+          .addImm(HasMetadataFlag)
           .addReg(BaseVal)
           .addReg(SizeVal);
       frameIdx2Reg[FrameIndex] = FrameObjMemRef;

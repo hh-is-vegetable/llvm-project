@@ -872,7 +872,7 @@ void Writer::finalizeGlobalAddress() {
           definedG->global->setMemrefVlaue(
               definedG->getVA(),     // addr
               definedG->getSize(),   // size
-              lld::wasm::HasMetadataFlag | lld::wasm::ValidPointerFlag | lld::wasm::GlobalVariableFlag/*attr:0010 0001 invalid metada,global*/ // TODO:attr means read only or others
+              lld::wasm::HasMetadataFlag | lld::wasm::GlobalVariableFlag/*attr:0010 0001 invalid metada,global*/ // TODO:attr means read only or others
           );
           LLVM_DEBUG(dbgs() << "Global name: " << sym->getName() << "; global val: " <<
                      definedG->getVA() << "\n");

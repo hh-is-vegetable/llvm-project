@@ -83,7 +83,7 @@ bool WebAssemblyInsertInsForFree::runOnMachineFunction(MachineFunction &MF) {
         if (!MI.getOperand(Idx).isGlobal() || !MI.getOperand(Idx).getGlobal()->getValueType()->isFunctionTy())continue;
         MachineOperand& MO = MI.getOperand(Idx);
         GV = MO.getGlobal();
-        if (GV->getName() == "free") {
+        if (GV->getName() == "dlfree") {
           IsFree = true;
           break;
         }
