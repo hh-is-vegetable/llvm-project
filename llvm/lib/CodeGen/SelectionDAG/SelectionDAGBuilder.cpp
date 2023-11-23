@@ -4365,8 +4365,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
     }
 
     if (const AllocaInst *Alloca = dyn_cast<AllocaInst>(PtrV)) {
-      LLVM_DEBUG(dbgs() << "visit store, ptr is from alloca\n");
-      Alloca->dump();
+      LLVM_DEBUG(dbgs() << "visit store, ptr is from alloca\n";Alloca->dump(););
       LLVM_DEBUG(dbgs() << "\n ptr is from alloca end\n");
       if (Alloca->isSwiftError())
         return visitStoreToSwiftError(I);
