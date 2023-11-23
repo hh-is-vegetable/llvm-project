@@ -512,7 +512,7 @@ def : Pat<(memref (WebAssemblyWrapper_Memref tglobaladdr:$addr)),
           (GLOBAL_GET_Addr tglobaladdr:$addr)>, Requires<[HasAddr32]>;
 
 let mayStore = 1 in
-defm MEMREF_DEALLOC : I<(outs), (ins MEMREF:$ref),
-                    (outs), (ins), [],
-                    "memref.dealloc\t$ref",
-                    "memref.dealloc\t", 0xc9>;
+defm MEMREF_DEALLOC : I<(outs), (ins i32imm_op:$info, MEMREF:$ref),
+                    (outs), (ins i32imm_op:$info), [],
+                    "memref.dealloc\t$info,$ref",
+                    "memref.dealloc\t$info", 0xc9>;

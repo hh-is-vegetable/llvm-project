@@ -80,7 +80,7 @@ public:
 
   void setPointerValue(uint64_t value) {
     bool is64 = config->is64.getValueOr(false);
-    initExpr = is64 ? intConst(value, config->is64.getValueOr(false)) : memrefAlloc(value, 0, 1, is64);
+    initExpr = is64 ? intConst(value, config->is64.getValueOr(false)) : memrefAlloc(value, 0, GlobalVariableFlag, is64);
   }
 
   void setMemrefVlaue(uint64_t addr, uint64_t size , uint64_t attr) {

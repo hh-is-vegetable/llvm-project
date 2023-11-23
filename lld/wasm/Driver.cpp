@@ -21,6 +21,7 @@
 #include "lld/Common/Strings.h"
 #include "lld/Common/Version.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/BinaryFormat/Wasm.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Object/Wasm.h"
 #include "llvm/Option/Arg.h"
@@ -614,9 +615,10 @@ static void createSyntheticSymbols() {
   createUndefinedFunction(
         "__imported_host_get_value", StringRef("__get_value"), StringRef("__host"), &i64ArgSignaturei32
       );
-  static WasmSignature i32i64ArgSignature = {{}, {ValType::I32, ValType::I64}};
+  // addr-key, base, size, attr, imm
+  static WasmSignature i32x5ArgSignature = {{}, {ValType::I32, ValType::I32, ValType::I32, ValType::I32, ValType::I32}};
   createUndefinedFunction(
-      "__imported_host_set_value", StringRef("__set_value"), StringRef("__host"), &i32i64ArgSignature
+      "__imported_host_set_value", StringRef("__set_value"), StringRef("__host"), &i32x5ArgSignature
       );
 
   static WasmSignature nullSignature = {{}, {}};

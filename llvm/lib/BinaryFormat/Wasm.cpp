@@ -59,26 +59,3 @@ bool llvm::wasm::relocTypeHasAddend(uint32_t Type) {
     return false;
   }
 }
-
-//std::string llvm::wasm::toString(wasm::ValType Type) {
-//  switch (Type) {
-//  case wasm::ValType::I32:
-//    return "I32";
-//  case wasm::ValType::I64:
-//    return "I64";
-//  case wasm::ValType::MEMREF:
-//    return "MEMREF";
-//  case wasm::ValType::EXTERNREF:
-//    return "EXTERNREF";
-//  case wasm::ValType::FUNCREF:
-//    return "FUNCREF";
-//  case wasm::ValType::F32:
-//    return "F32";
-//  case wasm::ValType::F64:
-//    return "F64";
-//  case wasm::ValType::V128:
-//    return "V128";
-//  default:
-//    llvm_unreachable("unknown wasm value type");
-//  }
-//}
