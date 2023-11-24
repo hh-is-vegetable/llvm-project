@@ -32,6 +32,7 @@
 #include "llvm/Support/Parallel.h"
 
 #include <cstdarg>
+#include <cstdint>
 #include <map>
 
 #define DEBUG_TYPE "lld"
@@ -868,11 +869,12 @@ void Writer::finalizeGlobalAddress() {
     for(auto *sym : file->getSymbols()) {
       if(auto *definedG = dyn_cast<DefinedGlobal>(sym)) {
         // global variable like __stack_pointer no need to init again
+        uint64_t attr = definedG->getSize() ? (lld::wasm::HasMetadataFlag | lld::wasm::GlobalVariableFlag) : lld::wasm::GlobalVariableFlag;
         if(definedG->segment) {
           definedG->global->setMemrefVlaue(
               definedG->getVA(),     // addr
               definedG->getSize(),   // size
-              lld::wasm::HasMetadataFlag | lld::wasm::ValidPointerFlag | lld::wasm::GlobalVariableFlag/*attr:0010 0001 invalid metada,global*/ // TODO:attr means read only or others
+              attr // TODO:attr means read only or others
           );
           LLVM_DEBUG(dbgs() << "Global name: " << sym->getName() << "; global val: " <<
                      definedG->getVA() << "\n");

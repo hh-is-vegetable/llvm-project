@@ -116,12 +116,12 @@ bool WebAssemblyAfterCallMalloc::runOnMachineFunction(MachineFunction &MF) {
           .addReg(CallResReg);
 
       const uint32_t HasMetadataFlag = 0x20; // 0010 0000
-      const uint32_t ValidPointerFlag = 0x10; // 0001 0000
+      // const uint32_t ValidPointerFlag = 0x10; // 0001 0000
       const uint32_t HeapVariableFlag = 0x02; // 0000 0010
       // const uint32_t GlobalVariableFlag = 0x01; // 0000 0001
       BuildMI(*MI.getParent(), InsertPos, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_NULL), NullReg);
       BuildMI(*MI.getParent(), InsertPos, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_ALLOC), AllocReg)
-          .addImm(HasMetadataFlag | ValidPointerFlag | HeapVariableFlag) //attr:0010 0010 valid metada, heap
+          .addImm(HasMetadataFlag | HeapVariableFlag) //attr:0010 0010 valid metadata, heap
           .addReg(BaseReg)
           .addReg(SizeReg);
       BuildMI(*MI.getParent(), InsertPos, MI.getDebugLoc(), TII->get(WebAssembly::SELECT_MEMREF), SelectReg)
