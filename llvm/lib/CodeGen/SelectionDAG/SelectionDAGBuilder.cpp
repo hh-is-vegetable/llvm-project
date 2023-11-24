@@ -49,6 +49,7 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/RuntimeLibcalls.h"
 #include "llvm/CodeGen/SelectionDAG.h"
+#include "llvm/CodeGen/SelectionDAGNodes.h"
 #include "llvm/CodeGen/SelectionDAGTargetInfo.h"
 #include "llvm/CodeGen/StackMaps.h"
 #include "llvm/CodeGen/SwiftErrorValueTracking.h"
@@ -3539,8 +3540,21 @@ void SelectionDAGBuilder::visitIntToPtr(const User &I) {
     // const uint32_t ValidPointerFlag = 0x10; // 0001 0000
     // const uint32_t HeapVariableFlag = 0x02; // 0000 0010
     // const uint32_t GlobalVariableFlag = 0x01; // 0000 0001
-    setValue(&I, DAG.getNode(ISD::WASM_MEMREF_ALLOC, getCurSDLoc(), DestVT,
-                             DAG.getConstant(0, getCurSDLoc(), PtrIntTy)/*attr:invalid metada*/, N, DAG.getConstant(0, getCurSDLoc(), PtrIntTy)));
+    SDValue N1 = DAG.getNode(ISD::WASM_MEMREF_NULL, getCurSDLoc(), DestVT);
+    if (const ConstantSDNode *C = dyn_cast_or_null<ConstantSDNode>(N)) {
+      int64_t v = C->getSExtValue();
+      assert( (v == -1 || v == 0 || v == 1 || v == 2) && "inttoptr should be some special value if convert a const value to pointer");
+      if (v)N1 = DAG.getNode(ISD::WASM_MEMREF_ADD, getCurSDLoc(), DestVT,
+                             N1,
+                             N);
+      setValue(&I, N1);
+      return;
+    }
+    setValue(&I, DAG.getNode(ISD::WASM_MEMREF_ADD, getCurSDLoc(), DestVT,
+                          N1,
+                          N));
+    // setValue(&I, DAG.getNode(ISD::WASM_MEMREF_ALLOC, getCurSDLoc(), DestVT,
+    //                          DAG.getConstant(0, getCurSDLoc(), PtrIntTy)/*attr:invalid metada*/, N, DAG.getConstant(0, getCurSDLoc(), PtrIntTy)));
     return;
   }
   EVT PtrMemVT = TLI.getMemValueType(DAG.getDataLayout(), I.getType());
