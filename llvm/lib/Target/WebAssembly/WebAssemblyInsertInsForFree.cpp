@@ -92,24 +92,30 @@ bool WebAssemblyInsertInsForFree::runOnMachineFunction(MachineFunction &MF) {
       LLVM_DEBUG(dbgs() << "dump before change"; MI.getParent()->dump(););
 
 
-      Register ToBeFreeReg = MI.getOperand(1).getReg();
-      Register AddrIntValReg = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
-      Register ZeroConstReg = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
-      Register AllocReg = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
-      // %toBeFree
-      // %AddrIntVal = memref.field 0, %toBeFree
-      // %zero = i32.const 0
-      // %alloc = memref.alloc %AddrIntVal, %zero, %zero
-      BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_FIELD), AddrIntValReg)
-          .addImm(0)
-          .addReg(ToBeFreeReg);
-       BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::CONST_I32), ZeroConstReg)
-           .addImm(0);
-      BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_ALLOC), AllocReg)
-          .addImm(0x02) // attr:metadata no use, 0000 0010.TODO:use memref.free
-          .addReg(AddrIntValReg)
-          .addReg(ZeroConstReg);
-      MI.getOperand(1).ChangeToRegister(AllocReg, false);
+      // auto InsertIns = I;
+      const uint32_t HeapVariableFlag = 0x02; // 0000 0010
+      // if (I->getOpcode() == WebAssembly::CALL_RESULTS)InsertIns = std::next(InsertIns);
+      BuildMI(MBB, &MI, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_DEALLOC))
+          .addImm(HeapVariableFlag)
+          .addReg(MI.getOperand(1).getReg());
+      // Register ToBeFreeReg = MI.getOperand(1).getReg();
+      // Register AddrIntValReg = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
+      // Register ZeroConstReg = MRI.createVirtualRegister(&WebAssembly::I32RegClass);
+      // Register AllocReg = MRI.createVirtualRegister(&WebAssembly::MEMREFRegClass);
+      // // %toBeFree
+      // // %AddrIntVal = memref.field 0, %toBeFree
+      // // %zero = i32.const 0
+      // // %alloc = memref.alloc %AddrIntVal, %zero, %zero
+      // BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_FIELD), AddrIntValReg)
+      //     .addImm(0)
+      //     .addReg(ToBeFreeReg);
+      //  BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::CONST_I32), ZeroConstReg)
+      //      .addImm(0);
+      // BuildMI(*MI.getParent(), &MI, MI.getDebugLoc(), TII->get(WebAssembly::MEMREF_ALLOC), AllocReg)
+      //     .addImm(0x02) // attr:metadata no use, 0000 0010.TODO:use memref.free
+      //     .addReg(AddrIntValReg)
+      //     .addReg(ZeroConstReg);
+      // MI.getOperand(1).ChangeToRegister(AllocReg, false);
 
 
       LLVM_DEBUG(dbgs() << "dump a after"; MI.getParent()->dump(););

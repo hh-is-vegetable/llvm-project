@@ -4087,6 +4087,7 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
   }
 
   if(isNarrow) {
+    assert(NarrowNewSize < (1LL << 24));
     N = DAG.getNode(ISD::WASM_MEMREF_NARROW, dl, N.getValueType(),
                     DAG.getConstant(NarrowNewSize, dl, N.getValueType().changeTypeToInteger()),
                     NarrowBase,

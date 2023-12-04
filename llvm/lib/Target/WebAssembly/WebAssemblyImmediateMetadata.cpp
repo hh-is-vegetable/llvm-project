@@ -36,6 +36,7 @@
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
+#include <cstdint>
 using namespace llvm;
 
 #define DEBUG_TYPE "wasm-immediate-metadata"
@@ -160,6 +161,13 @@ bool WebAssemblyImmediateMetadata::runOnMachineFunction(MachineFunction &MF) {
     DenseMap<unsigned, MachineInstr*> FrameMaxOffIns;                 // reg->max off
     DenseMap<unsigned, MachineInstr*> FrameMinOffIns;                 // reg->min off
     for (MachineInstr& MI : MBB) {
+      if (MI.getOpcode() == WebAssembly::MEMREF_NARROW && (MF.getName() == "dlfree" || MF.getName() == "dlmalloc")) {
+        int64_t narrowSize = MI.getOperand(1).getImm();
+        narrowSize |= 0x08000000;
+        MI.getOperand(1).setImm(narrowSize);
+        Changed = true;
+        continue ;
+      }
       if (!MI.mayLoadOrStore() || !isMSLoadOrStore(MI, TII))
         continue ;
       // only look up address in store/load
